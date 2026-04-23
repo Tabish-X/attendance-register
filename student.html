@@ -1,0 +1,865 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Attendify - Student Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css" />
+<style>
+.subject-att-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+  margin-bottom: 20px;
+}
+.subject-att-head {
+  padding: 14px 20px;
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  user-select: none;
+}
+.subject-att-head:hover { background: #ededea; }
+.subject-att-body { padding: 18px 20px; }
+
+.pct-circle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  font-size: 1.1rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.pct-high { background: var(--success-light); color: var(--success); border: 2px solid #86efac; }
+.pct-mid { background: var(--warning-light); color: var(--warning); border: 2px solid #fde68a; }
+.pct-low { background: var(--danger-light); color: var(--danger); border: 2px solid #fca5a5; }
+
+.month-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+.month-row:last-child { border-bottom: none; }
+.month-label { width: 90px; font-size: 0.85rem; font-weight: 500; flex-shrink: 0; }
+.month-bar { flex: 1; }
+.month-pct { width: 50px; text-align: right; font-size: 0.85rem; font-weight: 600; flex-shrink: 0; }
+
+.overview-card {
+  background: var(--accent);
+  color: #fff;
+  border-radius: var(--radius-lg);
+  padding: 24px 28px;
+  margin-bottom: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+.overview-card .overview-left h2 { color: #fff; font-size: 1.1rem; margin-bottom: 4px; }
+.overview-card .overview-left p { color: rgba(255,255,255,0.75); font-size: 0.85rem; }
+.overview-big-pct {
+  font-size: 3rem;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.04em;
+  color: #fff;
+}
+.overview-sub { font-size: 0.82rem; color: rgba(255,255,255,0.7); margin-top: 4px; }
+
+.link-roll-box {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 22px;
+  margin-bottom: 24px;
+}
+
+.toggle-chevron {
+  transition: transform 0.2s;
+  flex-shrink: 0;
+}
+.toggle-chevron.open { transform: rotate(180deg); }
+
+/* Mobile nav */
+.mobile-nav {
+  display: none;
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  z-index: 200;
+  padding: 8px 0 env(safe-area-inset-bottom, 8px);
+}
+@media (max-width: 768px) {
+  .mobile-nav { display: flex; justify-content: space-around; }
+  body { padding-bottom: 64px; }
+}
+.mobile-nav-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 12px;
+  font-size: 0.68rem;
+  color: var(--text-3);
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: var(--font);
+  transition: color 0.12s;
+}
+.mobile-nav-btn.active { color: var(--accent); }
+
+/* Calendar-style date list */
+.date-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+.date-chip {
+  padding: 4px 10px;
+  border-radius: 100px;
+  font-size: 0.78rem;
+  font-weight: 500;
+  border: 1px solid;
+}
+.date-chip.P { background: var(--success-light); color: var(--success); border-color: #86efac; }
+.date-chip.A { background: var(--danger-light); color: var(--danger); border-color: #fca5a5; }
+</style>
+</head>
+<body>
+
+<!-- TOPBAR -->
+<header class="topbar">
+  <span class="topbar-brand">Attendify</span>
+  <div class="topbar-right">
+    <span class="topbar-user" id="userLabel"></span>
+    <button class="btn btn-ghost btn-sm" onclick="handleLogout()">Sign Out</button>
+  </div>
+</header>
+
+<!-- LAYOUT -->
+<div class="layout">
+
+  <!-- SIDEBAR -->
+  <nav class="sidebar">
+    <div class="sidebar-label">Student Panel</div>
+    <div class="sidebar-link active" id="nav-overview" onclick="showPage('overview')">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+      Overview
+    </div>
+    <div class="sidebar-link" id="nav-subjects" onclick="showPage('subjects')">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+      Subject-wise
+    </div>
+    <div class="sidebar-link" id="nav-account" onclick="showPage('account')">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      My Account
+    </div>
+  </nav>
+
+  <!-- MAIN -->
+  <main class="main">
+
+    <!-- ===== OVERVIEW PAGE ===== -->
+    <div class="page active" id="page-overview">
+      <div class="page-header">
+        <h2>My Attendance</h2>
+        <p class="text-sm text-muted" id="overviewSubText">Loading your attendance data...</p>
+      </div>
+      <div id="overviewContent">
+        <div class="empty-state"><p>Loading...</p></div>
+      </div>
+    </div>
+
+    <!-- ===== SUBJECT-WISE PAGE ===== -->
+    <div class="page" id="page-subjects">
+      <div class="page-header">
+        <h2>Subject-wise Attendance</h2>
+        <p class="text-sm text-muted">Detailed attendance and monthly breakdown for each subject.</p>
+      </div>
+      <div id="subjectWiseContent">
+        <div class="empty-state"><p>Loading...</p></div>
+      </div>
+    </div>
+
+    <!-- ===== ACCOUNT PAGE ===== -->
+    <div class="page" id="page-account">
+      <div class="page-header">
+        <h2>My Account</h2>
+        <p class="text-sm text-muted">Your profile, roll number, and joined divisions.</p>
+      </div>
+      <div class="card mb-5">
+        <div class="card-header"><h3>Profile</h3></div>
+        <div class="card-body">
+          <div style="display:flex; flex-direction:column; gap:10px;">
+            <div class="flex gap-3 items-center">
+              <span class="text-sm font-semibold" style="width:100px;">Name</span>
+              <span class="text-sm" id="profileName"></span>
+            </div>
+            <div class="flex gap-3 items-center">
+              <span class="text-sm font-semibold" style="width:100px;">Email</span>
+              <span class="text-sm" id="profileEmail"></span>
+            </div>
+            <div class="flex gap-3 items-center">
+              <span class="text-sm font-semibold" style="width:100px;">Role</span>
+              <span class="badge badge-blue">Student</span>
+            </div>
+            <div class="flex gap-3 items-center">
+              <span class="text-sm font-semibold" style="width:100px;">Roll Number</span>
+              <span class="text-sm font-semibold" id="profileRoll" style="color:var(--accent);">Not set</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Roll number set (only if not set yet) -->
+      <div class="card mb-5" id="setRollCard" style="display:none;">
+        <div class="card-header"><h3>Set Your Roll Number</h3></div>
+        <div class="card-body">
+          <div class="alert alert-info mb-3">
+            Enter your roll number once. It cannot be changed after being set. After setting it, use join codes from your teachers to join divisions.
+          </div>
+          <div style="display:flex; gap:10px; align-items:flex-end;">
+            <div class="input-group" style="flex:1;">
+              <label>Roll Number</label>
+              <input class="field" type="text" id="rollNumberInput" placeholder="e.g. 23" />
+            </div>
+            <button class="btn btn-primary" onclick="handleSetRoll()">Set Roll Number</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Joined divisions -->
+      <div class="card">
+        <div class="card-header">
+          <h3>Joined Divisions</h3>
+          <div id="joinBtnWrap"></div>
+        </div>
+        <div class="card-body" id="divisionsLinksList">
+          <div class="empty-state"><p>No divisions joined yet.</p></div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- Mobile nav -->
+<div class="mobile-nav">
+  <div class="mobile-nav-inner">
+    <button class="mobile-nav-btn active" id="mnav-overview" onclick="showPage('overview')">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+      Overview
+    </button>
+    <button class="mobile-nav-btn" id="mnav-subjects" onclick="showPage('subjects')">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+      Subjects
+    </button>
+    <button class="mobile-nav-btn" id="mnav-account" onclick="showPage('account')">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      Account
+    </button>
+  </div>
+</div>
+
+
+<!-- Defaulter Warning Popup — full screen -->
+<div id="defaulterOverlay" style="
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 9998;
+  background: rgba(0,0,0,0.85);
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+">
+  <div style="
+    background: #fff;
+    border-radius: 16px;
+    max-width: 400px;
+    width: 100%;
+    overflow: hidden;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+    animation: popIn 0.25s ease;
+  ">
+    <div style="background: var(--danger); padding: 28px 28px 20px; text-align:center;">
+      <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom:12px;">
+        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+        <line x1="12" y1="9" x2="12" y2="13"/>
+        <line x1="12" y1="17" x2="12.01" y2="17"/>
+      </svg>
+      <h2 style="color:#fff; font-size:1.3rem; margin-bottom:6px; font-weight:700;">Attendance Warning</h2>
+      <p style="color:rgba(255,255,255,0.85); font-size:0.88rem;">This month</p>
+    </div>
+    <div style="padding: 24px 28px;">
+      <p style="font-size:1rem; color:var(--text); line-height:1.6; margin-bottom:8px; font-weight:500;">
+        Your overall attendance this month is below 75%.
+      </p>
+      <p style="font-size:0.88rem; color:var(--text-3); line-height:1.6; margin-bottom:20px;">
+        You may be added to the defaulter list. Defaulters can be barred from exams. Please attend your classes.
+      </p>
+      <div style="background:var(--danger-light); border:1px solid #fca5a5; border-radius:8px; padding:12px 16px; margin-bottom:20px; text-align:center;">
+        <div style="font-size:0.78rem; color:var(--danger); font-weight:600; text-transform:uppercase; letter-spacing:0.06em; margin-bottom:4px;">This month's overall</div>
+        <div id="defaulterPctDisplay" style="font-size:2rem; font-weight:700; color:var(--danger); line-height:1;">0%</div>
+      </div>
+      <button onclick="document.getElementById('defaulterOverlay').style.display='none';" style="
+        width: 100%;
+        padding: 12px;
+        background: var(--danger);
+        color: #fff;
+        border: none;
+        border-radius: 8px;
+        font-family: var(--font);
+        font-size: 0.95rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background 0.15s;
+      " onmouseover="this.style.background='#991b1b'" onmouseout="this.style.background='var(--danger)'">
+        I understand, close
+      </button>
+    </div>
+  </div>
+</div>
+<style>
+@keyframes popIn {
+  from { transform: scale(0.88); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+</style>
+
+<!-- Join Division Modal -->
+<div class="modal-backdrop" id="modalJoin">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="joinModalTitle">Join a Division</h3>
+      <button class="btn btn-ghost btn-sm" onclick="closeModal('modalJoin')">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div class="alert alert-info" id="joinModalInfo">
+        Enter the 6-character join code from your teacher to join their division.
+      </div>
+      <div class="input-group" id="rollInputGroup" style="display:none;">
+        <label>Your Roll Number</label>
+        <input class="field" type="text" id="jRoll" placeholder="e.g. 23" />
+        <small class="text-muted" style="margin-top:4px; display:block;">Set once. Cannot be changed later.</small>
+      </div>
+      <div class="input-group">
+        <label>Join Code</label>
+        <input class="field" type="text" id="jCode" placeholder="e.g. AB3K9X" maxlength="6"
+          style="text-transform:uppercase; font-family:var(--font-mono); letter-spacing:0.15em; font-size:1.15rem; font-weight:700;" />
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modalJoin')">Cancel</button>
+      <button class="btn btn-primary" onclick="handleJoinDivision()">Join Division</button>
+    </div>
+  </div>
+</div>
+
+<div class="loading-overlay" id="loadingOverlay"><div class="spinner"></div></div>
+
+<script type="module">
+import {
+  auth,
+  getUserProfile, logoutUser,
+  findStudentLinks, joinDivisionByCode, removeStudentLink,
+  setStudentRoll,
+  getDivisionSubjects, getDivisions,
+  getStudentAttendanceForSubject,
+  calcAttendancePct, groupByMonth, formatMonthLabel, formatDate,
+  onAuthStateChanged
+} from "./firebase.js";
+
+let currentUser = null;
+let myProfile = null;
+let myRoll = null;
+let myLinks = [];
+let allSubjectData = [];
+
+function setLoading(v) {
+  document.getElementById("loadingOverlay").classList.toggle("show", v);
+}
+
+// ===== AUTH GUARD =====
+onAuthStateChanged(auth, async (user) => {
+  if (!user) { window.location.href = "index.html"; return; }
+  if (!user.emailVerified) { window.location.href = "index.html"; return; }
+  const profile = await getUserProfile(user.uid);
+  if (!profile || profile.role !== "student") { window.location.href = "index.html"; return; }
+  currentUser = { ...user };
+  myProfile = profile;
+  myRoll = profile.myRoll || null;
+  document.getElementById("userLabel").textContent = profile.name || user.email;
+  document.getElementById("profileName").textContent = profile.name || "-";
+  document.getElementById("profileEmail").textContent = user.email;
+  await loadAllData();
+});
+
+async function loadAllData() {
+  setLoading(true);
+  myLinks = await findStudentLinks(currentUser.uid);
+  const freshProfile = await getUserProfile(currentUser.uid);
+  myRoll = freshProfile?.myRoll || null;
+  myProfile = freshProfile;
+  await buildSubjectData();
+  renderOverview();
+  renderSubjectWise();
+  renderAccountPage();
+  setLoading(false);
+  // Check for defaulter warning after data is loaded
+  checkDefaulterWarning();
+}
+
+// ===== DEFAULTER WARNING =====
+function checkDefaulterWarning() {
+  if (!allSubjectData.length) return;
+
+  const now = new Date();
+  const day = now.getDate();
+  const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+
+  // Only show from 18th onwards
+  if (day < 18) return;
+
+  // Calculate OVERALL monthly attendance across all subjects combined
+  let totalPresent = 0, totalClasses = 0;
+  for (const d of allSubjectData) {
+    const mp = d.monthlyPcts[currentMonth];
+    if (mp && mp.total > 0) {
+      totalPresent += mp.present;
+      totalClasses += mp.total;
+    }
+  }
+
+  // No data for this month yet
+  if (totalClasses === 0) return;
+
+  const overallMonthPct = parseFloat(((totalPresent / totalClasses) * 100).toFixed(2));
+
+  // Only warn if overall monthly attendance is below 75%
+  if (overallMonthPct >= 75) return;
+
+  // Show once per browser session (every time they open the tab/visit the site)
+  const sessionKey = `defaulterShown_${currentMonth}`;
+  if (sessionStorage.getItem(sessionKey)) return;
+  sessionStorage.setItem(sessionKey, "1");
+
+  // Show full-screen popup
+  document.getElementById("defaulterPctDisplay").textContent = overallMonthPct + "%";
+  document.getElementById("defaulterOverlay").style.display = "flex";
+
+  // Browser notification on 18th and 25th exactly
+  if (day === 18 || day === 25) {
+    sendDefaulterNotification(overallMonthPct);
+  }
+}
+
+function sendDefaulterNotification(pct) {
+  if (!("Notification" in window)) return;
+
+  const send = () => {
+    new Notification("Attendance Warning — Attendify", {
+      body: `Your overall attendance this month is ${pct}%. You may be placed on the defaulter list.`,
+      icon: "/favicon.ico",
+      tag: "defaulter-warning",
+    });
+  };
+
+  if (Notification.permission === "granted") {
+    send();
+  } else if (Notification.permission !== "denied") {
+    Notification.requestPermission().then(perm => {
+      if (perm === "granted") send();
+    });
+  }
+}
+
+async function buildSubjectData() {
+  allSubjectData = [];
+  for (const link of myLinks) {
+    const { classId, divisionId, roll } = link;
+    const subjects = await getDivisionSubjects(classId, divisionId);
+    for (const subject of subjects) {
+      const records = await getStudentAttendanceForSubject(subject.id, roll);
+      const pct = calcAttendancePct(records);
+      const monthly = groupByMonth(records);
+      const monthlyPcts = {};
+      for (const [month, recs] of Object.entries(monthly)) {
+        monthlyPcts[month] = calcAttendancePct(recs);
+      }
+      allSubjectData.push({ subject, roll, classId, divisionId, records, pct, monthlyPcts });
+    }
+  }
+}
+
+// ===== PAGE NAV =====
+window.showPage = function(page) {
+  document.querySelectorAll(".page").forEach(p => p.classList.remove("active"));
+  document.getElementById(`page-${page}`).classList.add("active");
+  document.querySelectorAll(".sidebar-link").forEach(l => l.classList.remove("active"));
+  document.getElementById(`nav-${page}`).classList.add("active");
+  document.querySelectorAll(".mobile-nav-btn").forEach(b => b.classList.remove("active"));
+  const mb = document.getElementById(`mnav-${page}`);
+  if (mb) mb.classList.add("active");
+};
+
+window.handleLogout = async function() {
+  await logoutUser();
+  window.location.href = "index.html";
+};
+
+window.openModal = function(id) { document.getElementById(id).classList.add("open"); };
+window.closeModal = function(id) { document.getElementById(id).classList.remove("open"); };
+
+// ===== SET ROLL NUMBER =====
+window.handleSetRoll = async function() {
+  const roll = document.getElementById("rollNumberInput").value.trim();
+  if (!roll || isNaN(parseInt(roll))) { alert("Please enter a valid roll number."); return; }
+  if (!confirm("Set roll number to " + roll + "? This cannot be changed later.")) return;
+  setLoading(true);
+  try {
+    await setStudentRoll(currentUser.uid, roll);
+    myRoll = roll;
+    await loadAllData();
+  } catch(e) {
+    setLoading(false);
+    alert(e.message || "Error setting roll number.");
+  }
+};
+
+// ===== JOIN DIVISION =====
+window.openJoinModal = function() {
+  document.getElementById("jCode").value = "";
+  if (myRoll) {
+    document.getElementById("joinModalTitle").textContent = "Join a Division";
+    document.getElementById("joinModalInfo").innerHTML =
+      `Your roll number is <strong>${myRoll}</strong>. Enter the 6-character join code from your teacher.`;
+    document.getElementById("rollInputGroup").style.display = "none";
+  } else {
+    document.getElementById("joinModalTitle").textContent = "Join Your First Division";
+    document.getElementById("joinModalInfo").innerHTML =
+      `Enter your roll number and the 6-character join code from your teacher. Your roll number will be saved permanently.`;
+    document.getElementById("rollInputGroup").style.display = "flex";
+    document.getElementById("jRoll").value = "";
+  }
+  openModal("modalJoin");
+};
+
+window.handleJoinDivision = async function() {
+  const code = document.getElementById("jCode").value.trim().toUpperCase();
+  if (!code || code.length !== 6) { alert("Please enter a valid 6-character join code."); return; }
+
+  let roll = myRoll;
+  if (!roll) {
+    roll = document.getElementById("jRoll").value.trim();
+    if (!roll || isNaN(parseInt(roll))) { alert("Please enter your roll number."); return; }
+  }
+
+  setLoading(true);
+  try {
+    if (!myRoll) {
+      await setStudentRoll(currentUser.uid, roll);
+      myRoll = roll;
+    }
+    await joinDivisionByCode(currentUser.uid, code, myRoll);
+    closeModal("modalJoin");
+    await loadAllData();
+  } catch(e) {
+    setLoading(false);
+    alert(e.message || "Error joining division. Please check the join code.");
+  }
+};
+
+window.handleRemoveLink = async function(linkId) {
+  if (!confirm("Leave this division? You can rejoin later with the join code.")) return;
+  setLoading(true);
+  await removeStudentLink(linkId);
+  await loadAllData();
+};
+
+// ===== ACCOUNT PAGE =====
+function renderAccountPage() {
+  const rollEl = document.getElementById("profileRoll");
+  if (myRoll) {
+    rollEl.textContent = myRoll;
+    document.getElementById("setRollCard").style.display = "none";
+  } else {
+    rollEl.textContent = "Not set";
+    document.getElementById("setRollCard").style.display = "block";
+  }
+
+  document.getElementById("joinBtnWrap").innerHTML =
+    `<button class="btn btn-primary btn-sm" onclick="openJoinModal()">Join Division</button>`;
+
+  const list = document.getElementById("divisionsLinksList");
+  if (!myLinks.length) {
+    list.innerHTML = `
+      <div class="empty-state">
+        <p>No divisions joined yet.</p>
+        <p class="text-xs" style="margin-top:6px;">Click "Join Division" and enter the 6-character code from your teacher.</p>
+      </div>`;
+    return;
+  }
+
+  (async () => {
+    let html = `<div style="display:flex; flex-direction:column; gap:0;">`;
+    for (const link of myLinks) {
+      let divName = "Division";
+      try {
+        const divs = await getDivisions(link.classId);
+        const found = divs.find(d => d.id === link.divisionId);
+        if (found) divName = found.name;
+      } catch(_) {}
+      html += `
+        <div style="display:flex; align-items:center; justify-content:space-between; padding:12px 0; border-bottom:1px solid var(--border);">
+          <div>
+            <div class="flex items-center gap-2 mb-1">
+              <span class="font-semibold text-sm">${divName}</span>
+              <span class="badge badge-green">Active</span>
+            </div>
+            <div class="text-xs text-muted">
+              Roll: <strong>${link.roll}</strong>
+              &nbsp;&middot;&nbsp;
+              Code: <span style="font-family:var(--font-mono); font-weight:700; letter-spacing:0.08em;">${link.joinCode || ''}</span>
+            </div>
+          </div>
+          <button class="btn btn-ghost btn-sm text-danger" onclick="handleRemoveLink('${link.id}')">Leave</button>
+        </div>`;
+    }
+    html += `</div>`;
+    list.innerHTML = html;
+  })();
+}
+
+// ===== OVERVIEW =====
+function renderOverview() {
+  const content = document.getElementById("overviewContent");
+  const subText = document.getElementById("overviewSubText");
+
+  if (!myLinks.length) {
+    subText.textContent = "";
+    content.innerHTML = `
+      <div class="link-roll-box">
+        <h3 class="mb-2">No divisions joined yet</h3>
+        <p class="text-sm text-muted mb-4">
+          Ask any teacher for their 6-character join code.
+          Enter your roll number once, then use join codes to join each teacher's division.
+          After that, just use the join code — no roll number needed again.
+        </p>
+        <button class="btn btn-primary" onclick="showPage('account'); setTimeout(openJoinModal, 100)">Join a Division</button>
+      </div>`;
+    return;
+  }
+
+  if (!allSubjectData.length) {
+    subText.textContent = "";
+    content.innerHTML = `<div class="empty-state"><p>No subjects or attendance data found yet. Your teachers need to add subjects and record attendance first.</p></div>`;
+    return;
+  }
+
+  let totalPresent = 0, totalClasses = 0;
+  allSubjectData.forEach(d => { totalPresent += d.pct.present; totalClasses += d.pct.total; });
+  const overallPct = totalClasses > 0 ? parseFloat(((totalPresent / totalClasses) * 100).toFixed(2)) : 0;
+  subText.textContent = `${allSubjectData.length} subject${allSubjectData.length !== 1 ? 's' : ''} across ${myLinks.length} division${myLinks.length !== 1 ? 's' : ''}.`;
+
+  content.innerHTML = `
+    <div class="overview-card">
+      <div class="overview-left">
+        <h2>Overall Attendance</h2>
+        <p>Across all subjects combined</p>
+        <p style="margin-top:8px; color:rgba(255,255,255,0.85); font-size:0.88rem;">${totalPresent} present out of ${totalClasses} total classes</p>
+      </div>
+      <div style="text-align:right;">
+        <div class="overview-big-pct">${overallPct}%</div>
+        <div class="overview-sub">${overallPct >= 75 ? 'Good standing' : overallPct >= 60 ? 'Needs improvement' : 'Critical - attend more classes'}</div>
+      </div>
+    </div>
+    <div class="stats-row">
+      ${allSubjectData.map(d => {
+        const p = d.pct.pct;
+        const pClass = p >= 75 ? "pct-high" : p >= 60 ? "pct-mid" : "pct-low";
+        const progressClass = p >= 75 ? "high" : p >= 60 ? "mid" : "low";
+        // Lectures needed / can skip
+        let lectureHint = "";
+        if (p < 75) {
+          // How many consecutive classes must be attended to reach 75%?
+          const needed = Math.ceil((0.75 * d.pct.total - d.pct.present) / 0.25);
+          lectureHint = `<div class="text-xs" style="color:var(--danger); margin-top:4px;">Attend ${needed} more to reach 75%</div>`;
+        } else {
+          // How many classes can still be missed while staying ≥ 75%?
+          const canSkip = Math.floor(d.pct.present / 0.75 - d.pct.total);
+          lectureHint = `<div class="text-xs" style="color:var(--success); margin-top:4px;">Can miss ${canSkip} more class${canSkip !== 1 ? 'es' : ''}</div>`;
+        }
+        return `
+          <div class="stat-card">
+            <div class="stat-label">${d.subject.name}</div>
+            <div style="display:flex; align-items:center; gap:12px; margin-top:8px;">
+              <div class="pct-circle ${pClass}">${p}%</div>
+              <div style="flex:1;">
+                <div class="progress-bar" style="margin-bottom:6px;">
+                  <div class="progress-fill ${progressClass}" style="width:${Math.min(p,100)}%;"></div>
+                </div>
+                <div class="text-xs text-muted">${d.pct.present}/${d.pct.total} classes</div>
+                ${lectureHint}
+              </div>
+            </div>
+          </div>`;
+      }).join("")}
+    </div>
+    <div class="card">
+      <div class="card-header"><h3>Subject Summary</h3></div>
+      <div class="card-body" style="padding:0;">
+        <div class="table-wrap" style="border:none; border-radius:0;">
+          <table>
+            <thead><tr><th>Subject</th><th>Present</th><th>Total</th><th>Percentage</th><th>Status</th><th>Need / Can Skip</th></tr></thead>
+            <tbody>
+              ${allSubjectData.map(d => {
+                const p = d.pct.pct;
+                const status = p >= 75 ? "Good" : p >= 60 ? "Warning" : "Critical";
+                const badgeClass = p >= 75 ? "badge-green" : p >= 60 ? "badge-yellow" : "badge-red";
+                let hint = "", hintColor = "";
+                if (p < 75) {
+                  const needed = Math.ceil((0.75 * d.pct.total - d.pct.present) / 0.25);
+                  hint = `Attend ${needed} more`;
+                  hintColor = "var(--danger)";
+                } else {
+                  const canSkip = Math.floor(d.pct.present / 0.75 - d.pct.total);
+                  hint = `Can miss ${canSkip}`;
+                  hintColor = "var(--success)";
+                }
+                return `<tr>
+                  <td class="font-semibold">${d.subject.name}</td>
+                  <td>${d.pct.present}</td>
+                  <td>${d.pct.total}</td>
+                  <td class="font-semibold">${p}%</td>
+                  <td><span class="badge ${badgeClass}">${status}</span></td>
+                  <td class="font-semibold text-sm" style="color:${hintColor};">${hint}</td>
+                </tr>`;
+              }).join("")}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    ${buildMonthlyOverviewHTML(allSubjectData)}`;
+}
+
+function buildMonthlyOverviewHTML(data) {
+  const allMonths = [...new Set(data.flatMap(d => Object.keys(d.monthlyPcts)))].sort();
+  if (!allMonths.length) return "";
+  const rows = allMonths.map(m => {
+    let monthPresent = 0, monthTotal = 0;
+    const cells = data.map(d => {
+      const mp = d.monthlyPcts[m];
+      if (!mp || mp.total === 0) return `<td class="text-center text-muted" style="font-size:0.82rem;">—</td>`;
+      monthPresent += mp.present; monthTotal += mp.total;
+      const cls = mp.pct >= 75 ? "text-success" : mp.pct >= 60 ? "text-accent" : "text-danger";
+      return `<td class="text-center font-semibold ${cls}" style="font-size:0.88rem;">${mp.pct}%<br><span class="text-xs text-muted font-normal">${mp.present}/${mp.total}</span></td>`;
+    }).join("");
+    const op = monthTotal > 0 ? parseFloat(((monthPresent/monthTotal)*100).toFixed(2)) : 0;
+    const oc = op >= 75 ? "badge-green" : op >= 60 ? "badge-yellow" : "badge-red";
+    return `<tr><td class="font-semibold" style="white-space:nowrap;">${formatMonthLabel(m)}</td>${cells}<td class="text-center"><span class="badge ${oc}">${op}%</span><br><span class="text-xs text-muted">${monthPresent}/${monthTotal}</span></td></tr>`;
+  }).join("");
+  return `
+    <div class="card mt-4">
+      <div class="card-header"><h3>Monthly Breakdown</h3></div>
+      <div class="card-body" style="padding:0;">
+        <div class="table-wrap" style="border:none; border-radius:0;">
+          <table>
+            <thead><tr><th>Month</th>${data.map(d=>`<th class="text-center">${d.subject.name}</th>`).join("")}<th class="text-center">Overall</th></tr></thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>
+      </div>
+    </div>`;
+}
+
+// ===== SUBJECT-WISE =====
+function renderSubjectWise() {
+  const content = document.getElementById("subjectWiseContent");
+  if (!allSubjectData.length) {
+    content.innerHTML = `<div class="empty-state"><p>No attendance data found. Join a division from the Account page.</p></div>`;
+    return;
+  }
+  content.innerHTML = allSubjectData.map((d, idx) => {
+    const p = d.pct.pct;
+    const pClass = p >= 75 ? "pct-high" : p >= 60 ? "pct-mid" : "pct-low";
+    const progressClass = p >= 75 ? "high" : p >= 60 ? "mid" : "low";
+    const months = Object.keys(d.monthlyPcts).sort();
+    const monthRows = months.map(m => {
+      const mp = d.monthlyPcts[m];
+      const mpc = mp.pct >= 75 ? "high" : mp.pct >= 60 ? "mid" : "low";
+      const dateBadges = d.records.filter(r => r.date.startsWith(m))
+        .map(r => `<span class="date-chip ${r.status}" title="${formatDate(r.date)}">${r.date.slice(8)} ${r.status}</span>`).join("");
+      return `
+        <div class="month-row" style="flex-direction:column; align-items:flex-start; gap:6px;">
+          <div style="display:flex; align-items:center; gap:12px; width:100%;">
+            <span class="month-label">${formatMonthLabel(m)}</span>
+            <div class="month-bar"><div class="progress-bar"><div class="progress-fill ${mpc}" style="width:${mp.pct}%;"></div></div></div>
+            <span class="month-pct">${mp.pct}%</span>
+            <span class="text-xs text-muted">${mp.present}/${mp.total}</span>
+          </div>
+          <div class="date-list">${dateBadges}</div>
+        </div>`;
+    }).join("");
+    return `
+      <div class="subject-att-card">
+        <div class="subject-att-head" onclick="toggleSubjectCard(${idx})">
+          <div style="display:flex; align-items:center; gap:14px;">
+            <div class="pct-circle ${pClass}">${p}%</div>
+            <div>
+              <h3 style="font-size:1rem; margin-bottom:2px;">${d.subject.name}</h3>
+              <span class="text-xs text-muted">${d.pct.present} present &nbsp;·&nbsp; ${d.pct.total - d.pct.present} absent &nbsp;·&nbsp; ${d.pct.total} total</span>
+            </div>
+          </div>
+          <svg class="toggle-chevron" id="chev-${idx}" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+        </div>
+        <div class="subject-att-body" id="subBody-${idx}" style="display:none;">
+          <div class="progress-bar mb-3" style="height:10px;">
+            <div class="progress-fill ${progressClass}" style="width:${p}%;"></div>
+          </div>
+          ${months.length ? `<h4 class="mb-3" style="font-size:0.9rem; color:var(--text-2);">Monthly Breakdown</h4>${monthRows}` : `<p class="text-sm text-muted">No attendance recorded yet.</p>`}
+        </div>
+      </div>`;
+  }).join("");
+}
+
+window.toggleSubjectCard = function(idx) {
+  const body = document.getElementById(`subBody-${idx}`);
+  const chev = document.getElementById(`chev-${idx}`);
+  const open = body.style.display === "none";
+  body.style.display = open ? "block" : "none";
+  chev.classList.toggle("open", open);
+};
+
+// Auto-uppercase join code
+document.getElementById("jCode").addEventListener("input", function() {
+  this.value = this.value.toUpperCase();
+});
+
+// Close modal on backdrop click
+document.querySelectorAll(".modal-backdrop").forEach(backdrop => {
+  backdrop.addEventListener("click", e => {
+    if (e.target === backdrop) backdrop.classList.remove("open");
+  });
+});
+</script>
+</body>
+</html>

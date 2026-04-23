@@ -1,0 +1,1963 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Attendify - Teacher Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css" />
+<style>
+.class-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+  transition: box-shadow 0.15s;
+}
+.class-card:hover { box-shadow: var(--shadow); }
+.class-card-head {
+  padding: 14px 18px;
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.class-card-body { padding: 14px 18px; }
+
+.div-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+  gap: 12px;
+}
+.div-row:last-child { border-bottom: none; }
+
+.att-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.roll-input-group {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+}
+
+.subject-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 0.86rem;
+}
+.subject-pill .pill-actions { display: flex; gap: 4px; }
+
+.session-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.88rem;
+}
+.session-row:last-child { border-bottom: none; }
+
+/* Attendance marking view */
+.att-mark-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(70px, 1fr));
+  gap: 8px;
+}
+.att-mark-cell {
+  border: 1.5px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  padding: 8px 4px;
+  text-align: center;
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.12s;
+}
+.att-mark-cell .roll-num { font-size: 0.78rem; font-weight: 600; color: var(--text-3); margin-bottom: 4px; }
+.att-mark-cell .status-badge {
+  font-size: 0.82rem;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 100px;
+}
+.att-mark-cell.present { background: var(--success-light); border-color: #86efac; }
+.att-mark-cell.present .status-badge { background: #dcfce7; color: var(--success); }
+.att-mark-cell.absent { background: var(--danger-light); border-color: #fca5a5; }
+.att-mark-cell.absent .status-badge { background: #fee2e2; color: var(--danger); }
+.att-mark-cell:hover { transform: translateY(-1px); box-shadow: var(--shadow-sm); }
+
+.section-sep {
+  height: 1px;
+  background: var(--border);
+  margin: 24px 0;
+}
+
+/* Classes grid */
+.classes-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 20px;
+}
+
+/* copy-id box */
+.id-box {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 4px 8px;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--text-2);
+  cursor: pointer;
+  transition: all 0.12s;
+}
+.id-box:hover { border-color: var(--accent); color: var(--accent); }
+
+/* nav mobile */
+.mobile-nav {
+  display: none;
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  z-index: 200;
+  padding: 8px 0 env(safe-area-inset-bottom, 8px);
+}
+@media (max-width: 768px) {
+  .mobile-nav { display: flex; justify-content: space-around; }
+  body { padding-bottom: 64px; }
+}
+
+.mobile-nav-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 12px;
+  font-size: 0.68rem;
+  color: var(--text-3);
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: var(--font);
+  transition: color 0.12s;
+}
+.mobile-nav-btn.active { color: var(--accent); }
+
+/* ===== PROFILE DROPDOWN ===== */
+.profile-dropdown-wrap {
+  position: relative;
+}
+.profile-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  cursor: pointer;
+  font-family: var(--font);
+  font-size: 0.85rem;
+  color: var(--text);
+  transition: all 0.12s;
+}
+.profile-btn:hover { background: var(--surface-2); border-color: var(--border-strong); }
+.profile-avatar {
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.8rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.profile-dropdown {
+  display: none;
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  min-width: 220px;
+  z-index: 500;
+  overflow: hidden;
+}
+.profile-dropdown.open { display: block; }
+.profile-dropdown-header {
+  padding: 14px 16px 10px;
+  border-bottom: 1px solid var(--border);
+}
+.profile-dropdown-header .pd-name { font-weight: 600; font-size: 0.92rem; color: var(--text); }
+.profile-dropdown-header .pd-email { font-size: 0.80rem; color: var(--text-3); margin-top: 2px; word-break: break-all; }
+.profile-dropdown-header .pd-role { margin-top: 6px; }
+.profile-dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  font-size: 0.88rem;
+  color: var(--text-2);
+  cursor: pointer;
+  transition: background 0.1s;
+  border: none;
+  background: none;
+  width: 100%;
+  font-family: var(--font);
+  text-align: left;
+}
+.profile-dropdown-item:hover { background: var(--surface-2); color: var(--text); }
+.profile-dropdown-item.danger { color: var(--danger); }
+.profile-dropdown-item.danger:hover { background: var(--danger-light); }
+</style>
+</head>
+<body>
+
+<!-- TOPBAR -->
+<header class="topbar">
+  <span class="topbar-brand">Attendify</span>
+  <div class="topbar-right">
+    <div class="profile-dropdown-wrap" id="profileWrap">
+      <button class="profile-btn" id="profileToggleBtn" onclick="toggleProfileDropdown()">
+        <div class="profile-avatar" id="profileAvatar">T</div>
+        <span id="profileBtnName">Teacher</span>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+      <div class="profile-dropdown" id="profileDropdown">
+        <div class="profile-dropdown-header">
+          <div class="pd-name" id="pdName">Loading...</div>
+          <div class="pd-email" id="pdEmail"></div>
+          <div class="pd-role"><span class="badge badge-blue">Teacher</span></div>
+        </div>
+        <button class="profile-dropdown-item danger" onclick="handleLogout()">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+          Sign Out
+        </button>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- LAYOUT -->
+<div class="layout">
+
+  <!-- SIDEBAR -->
+  <nav class="sidebar">
+    <div class="sidebar-label">Teacher Panel</div>
+    <div class="sidebar-link active" id="nav-classes" onclick="showPage('classes')">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+      Classes &amp; Divisions
+    </div>
+    <div class="sidebar-link" id="nav-subjects" onclick="showPage('subjects')">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+      Subjects
+    </div>
+    <div class="sidebar-link" id="nav-attendance" onclick="showPage('attendance')">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+      Mark Attendance
+    </div>
+    <div class="sidebar-link" id="nav-history" onclick="showPage('history')">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      Attendance History
+    </div>
+    <div class="sidebar-link" id="nav-students" onclick="showPage('students')">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      Roll Numbers
+    </div>
+    <div class="sidebar-link" id="nav-export" onclick="showPage('export')">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+      Export Reports
+    </div>
+  </nav>
+
+  <!-- MAIN -->
+  <main class="main">
+
+    <!-- ===== CLASSES PAGE ===== -->
+    <div class="page active" id="page-classes">
+      <div class="page-header flex justify-between items-center">
+        <div>
+          <h2>Classes &amp; Divisions</h2>
+          <p class="text-sm text-muted">Create classes, add divisions, and manage your groups.</p>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="openAddClassModal()">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          New Class
+        </button>
+      </div>
+      <div id="classesList" class="classes-grid">
+        <div class="empty-state"><p>No classes yet. Create your first class.</p></div>
+      </div>
+    </div>
+
+    <!-- ===== SUBJECTS PAGE ===== -->
+    <div class="page" id="page-subjects">
+      <div class="page-header">
+        <h2>Subjects</h2>
+        <p class="text-sm text-muted">Add subjects to a class and division.</p>
+      </div>
+      <div class="card mb-5">
+        <div class="card-header"><h3>Add New Subject</h3></div>
+        <div class="card-body">
+          <div class="grid-2 mb-3">
+            <div class="input-group">
+              <label>Select Class</label>
+              <select class="field" id="subjectClass" onchange="loadDivisionsForSubject()">
+                <option value="">Choose class...</option>
+              </select>
+            </div>
+            <div class="input-group">
+              <label>Select Division</label>
+              <select class="field" id="subjectDivision">
+                <option value="">Choose division...</option>
+              </select>
+            </div>
+          </div>
+          <div class="input-group mb-3">
+            <label>Subject Name</label>
+            <input class="field" type="text" id="subjectName" placeholder="e.g. Mathematics, Physics" />
+          </div>
+          <button class="btn btn-primary" onclick="handleAddSubject()">Add Subject</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header"><h3>Your Subjects</h3></div>
+        <div class="card-body" id="subjectsList">
+          <div class="empty-state"><p>No subjects added yet.</p></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== MARK ATTENDANCE PAGE ===== -->
+    <div class="page" id="page-attendance">
+      <div class="page-header">
+        <h2>Mark Attendance</h2>
+        <p class="text-sm text-muted">Select a subject and date, then mark present or absent for each student.</p>
+      </div>
+      <div class="card mb-5">
+        <div class="card-body">
+          <div class="grid-2 mb-3" style="gap: 12px;">
+            <div class="input-group">
+              <label>Select Subject</label>
+              <select class="field" id="attSubject" onchange="loadAttendanceGrid()">
+                <option value="">Choose subject...</option>
+              </select>
+            </div>
+            <div class="input-group">
+              <label>Date</label>
+              <input class="field" type="date" id="attDate" onchange="loadAttendanceGrid()" />
+            </div>
+          </div>
+          <div class="flex gap-2 flex-wrap" style="margin-bottom: 4px;">
+            <button class="btn btn-secondary btn-sm" onclick="markAll('P')">Mark All Present</button>
+            <button class="btn btn-secondary btn-sm" onclick="markAll('A')">Mark All Absent</button>
+            <button class="btn btn-primary btn-sm" onclick="saveAttendance()">Save Attendance</button>
+          </div>
+        </div>
+      </div>
+      <div id="attGridWrap">
+        <div class="empty-state"><p>Select a subject and date to start marking attendance.</p></div>
+      </div>
+    </div>
+
+    <!-- ===== HISTORY PAGE ===== -->
+    <div class="page" id="page-history">
+      <div class="page-header">
+        <h2>Attendance History</h2>
+        <p class="text-sm text-muted">View, edit, or delete past attendance sessions.</p>
+      </div>
+      <div class="card mb-4">
+        <div class="card-body">
+          <div class="input-group">
+            <label>Select Subject to view history</label>
+            <select class="field" id="histSubject" onchange="loadHistory()">
+              <option value="">Choose subject...</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      <div id="historyList">
+        <div class="empty-state"><p>Select a subject to view attendance history.</p></div>
+      </div>
+    </div>
+
+    <!-- ===== ROLL NUMBERS PAGE ===== -->
+    <div class="page" id="page-students">
+      <div class="page-header">
+        <h2>Roll Numbers</h2>
+        <p class="text-sm text-muted">View and manage student roll numbers in each division.</p>
+      </div>
+      <div class="card mb-4">
+        <div class="card-body">
+          <div class="grid-2">
+            <div class="input-group">
+              <label>Select Class</label>
+              <select class="field" id="rollClass" onchange="loadDivisionsForRoll()">
+                <option value="">Choose class...</option>
+              </select>
+            </div>
+            <div class="input-group">
+              <label>Select Division</label>
+              <select class="field" id="rollDivision" onchange="loadRollNumbers()">
+                <option value="">Choose division...</option>
+              </select>
+            </div>
+          </div>
+          <!-- Attendance filter — shown after a division is selected -->
+          <div id="rollAttFilter" style="display:none; margin-top:14px; padding-top:14px; border-top:1px solid var(--border);">
+            <p class="text-sm font-semibold mb-2" style="color:var(--text-2);">Show attendance % for a subject and month</p>
+            <div class="grid-2" style="gap:10px;">
+              <div class="input-group">
+                <label>Subject</label>
+                <select class="field" id="rollAttSubject" onchange="loadRollAttendance()">
+                  <option value="">Choose subject...</option>
+                </select>
+              </div>
+              <div class="input-group">
+                <label>Month</label>
+                <input class="field" type="month" id="rollAttMonth" onchange="loadRollAttendance()" />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div id="rollsContent">
+        <div class="empty-state"><p>Select a class and division to view roll numbers.</p></div>
+      </div>
+    </div>
+
+    <!-- ===== EXPORT REPORTS PAGE ===== -->
+    <div class="page" id="page-export">
+      <div class="page-header">
+        <h2>Export Reports</h2>
+        <p class="text-sm text-muted">Download attendance reports as Excel files.</p>
+      </div>
+
+      <!-- Full class report -->
+      <div class="card mb-5">
+        <div class="card-header">
+          <h3>Full Class Report</h3>
+        </div>
+        <div class="card-body">
+          <p class="text-sm text-muted mb-4">Downloads one Excel file with a separate sheet for each division. Each sheet shows all attendance dates, student names, roll numbers, and overall % for the selected month.</p>
+          <div class="grid-2 mb-3" style="gap:12px;">
+            <div class="input-group">
+              <label>Select Class</label>
+              <select class="field" id="exportClass" onchange="loadExportDivisions()">
+                <option value="">Choose class...</option>
+              </select>
+            </div>
+            <div class="input-group">
+              <label>Select Subject</label>
+              <select class="field" id="exportSubject">
+                <option value="">Choose subject...</option>
+              </select>
+            </div>
+          </div>
+          <div class="input-group mb-4" style="max-width:220px;">
+            <label>Month</label>
+            <input class="field" type="month" id="exportMonth" />
+          </div>
+          <button class="btn btn-primary" onclick="downloadClassReport()">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Download Excel
+          </button>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- Mobile nav -->
+<div class="mobile-nav">
+  <div class="mobile-nav-inner">
+    <button class="mobile-nav-btn active" id="mnav-classes" onclick="showPage('classes')">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+      Classes
+    </button>
+    <button class="mobile-nav-btn" id="mnav-subjects" onclick="showPage('subjects')">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+      Subjects
+    </button>
+    <button class="mobile-nav-btn" id="mnav-attendance" onclick="showPage('attendance')">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/></svg>
+      Attendance
+    </button>
+    <button class="mobile-nav-btn" id="mnav-history" onclick="showPage('history')">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      History
+    </button>
+    <button class="mobile-nav-btn" id="mnav-students" onclick="showPage('students')">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+      Rolls
+    </button>
+    <button class="mobile-nav-btn" id="mnav-export" onclick="showPage('export')">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Export
+    </button>
+  </div>
+</div>
+
+<!-- ===== MODALS ===== -->
+
+<!-- Add Class Modal -->
+<div class="modal-backdrop" id="modalAddClass">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="addClassTitle">Add New Class</h3>
+      <button class="btn btn-ghost btn-sm" onclick="closeModal('modalAddClass')">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div class="input-group">
+        <label>Class Name</label>
+        <input class="field" type="text" id="newClassName" placeholder="e.g. FYBSc IT, Class 10B" />
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modalAddClass')">Cancel</button>
+      <button class="btn btn-primary" id="saveClassBtn" onclick="handleSaveClass()">Add Class</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add Division Modal -->
+<div class="modal-backdrop" id="modalAddDivision">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>Add Division</h3>
+      <button class="btn btn-ghost btn-sm" onclick="closeModal('modalAddDivision')">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div class="input-group">
+        <label>Division Name</label>
+        <input class="field" type="text" id="newDivisionName" placeholder="e.g. Division A, Batch 1" />
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modalAddDivision')">Cancel</button>
+      <button class="btn btn-primary" onclick="handleSaveDivision()">Add Division</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add Roll Numbers Modal -->
+<div class="modal-backdrop" id="modalAddRolls">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>Add Roll Numbers</h3>
+      <button class="btn btn-ghost btn-sm" onclick="closeModal('modalAddRolls')">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div class="alert alert-info mb-3" style="font-size:0.85rem;">
+        Examples: &nbsp;<strong>1-60</strong> &nbsp;(range) &nbsp;·&nbsp; <strong>5,10,15</strong> &nbsp;(specific) &nbsp;·&nbsp; <strong>1-10,15,20-25</strong> &nbsp;(mix)
+      </div>
+      <div class="input-group">
+        <label>Roll Number Range</label>
+        <input class="field" type="text" id="rollInput" placeholder="e.g. 1-60 or 1,2,3" />
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modalAddRolls')">Cancel</button>
+      <button class="btn btn-primary" onclick="handleSaveRolls()">Add Roll Numbers</button>
+    </div>
+  </div>
+</div>
+
+<!-- View Session Modal (for editing) -->
+<div class="modal-backdrop" id="modalSession">
+  <div class="modal" style="max-width: 600px;">
+    <div class="modal-header">
+      <h3 id="sessionModalTitle">Attendance Session</h3>
+      <button class="btn btn-ghost btn-sm" onclick="closeModal('modalSession')">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div class="flex gap-2 mb-3 flex-wrap">
+        <button class="btn btn-secondary btn-sm" onclick="sessionMarkAll('P')">Mark All Present</button>
+        <button class="btn btn-secondary btn-sm" onclick="sessionMarkAll('A')">Mark All Absent</button>
+      </div>
+      <div id="sessionGrid" class="att-mark-grid"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-danger btn-sm" onclick="deleteSession()">Delete Session</button>
+      <button class="btn btn-secondary" onclick="closeModal('modalSession')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveSessionEdit()">Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<!-- View Session Modal (read-only) -->
+<div class="modal-backdrop" id="modalViewSession">
+  <div class="modal" style="max-width: 580px;">
+    <div class="modal-header">
+      <h3 id="viewSessionTitle">Attendance Session</h3>
+      <button class="btn btn-ghost btn-sm" onclick="closeModal('modalViewSession')">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="modal-body" id="viewSessionBody" style="gap: 0;"></div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modalViewSession')">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Save Success + Download Popup -->
+<div class="modal-backdrop" id="modalSaveSuccess">
+  <div class="modal" style="max-width:400px;">
+    <div class="modal-header">
+      <h3>Attendance Saved</h3>
+      <button class="btn btn-ghost btn-sm" onclick="closeModal('modalSaveSuccess')">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="modal-body" style="gap:10px;">
+      <div class="alert alert-success">Attendance has been saved successfully.</div>
+      <p class="text-sm text-muted">Do you want to download the attendance for this session as an Excel file?</p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modalSaveSuccess')">No, Close</button>
+      <button class="btn btn-primary" onclick="downloadSessionExcel()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Download Excel
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Attendance Tamper Alert -->
+<div id="tamperOverlay" style="
+  display:none; position:fixed; inset:0; z-index:9998;
+  background:rgba(0,0,0,0.9); align-items:center; justify-content:center; padding:16px;">
+  <div style="background:#fff; border-radius:16px; max-width:560px; width:100%; overflow:hidden; box-shadow:0 20px 60px rgba(0,0,0,0.5); animation:popIn 0.25s ease; max-height:92vh; display:flex; flex-direction:column;">
+    <div style="background:var(--danger); padding:24px 24px 16px; text-align:center; flex-shrink:0;">
+      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom:10px;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      <h2 style="color:#fff; font-size:1.25rem; font-weight:700; margin-bottom:4px;">Attendance Records Tampered</h2>
+      <p style="color:rgba(255,255,255,0.82); font-size:0.85rem;">The following attendance sessions were changed outside the app</p>
+    </div>
+    <div style="padding:20px 24px; overflow-y:auto; flex:1;">
+      <p style="font-size:0.92rem; color:var(--text); line-height:1.6; margin-bottom:14px; font-weight:500;">
+        One or more attendance records were edited or deleted directly from the Firebase Console, not through the app.
+      </p>
+      <div id="tamperDetailList" style="display:flex; flex-direction:column; gap:8px; margin-bottom:18px;"></div>
+      <p style="font-size:0.80rem; color:var(--text-3); line-height:1.6; margin-bottom:20px;">
+        If you did not make these changes, someone with Firebase access may have altered the data. Review the affected sessions in Attendance History.
+      </p>
+      <div style="display:flex; gap:10px; flex-wrap:wrap;">
+        <button onclick="dismissTamperAlert()" style="flex:1; min-width:120px; padding:11px; background:var(--surface-2); color:var(--text); border:1px solid var(--border); border-radius:8px; font-family:var(--font); font-size:0.9rem; font-weight:600; cursor:pointer;">
+          Dismiss
+        </button>
+        <button onclick="dismissTamperAlert(); showPage('history');" style="flex:2; min-width:160px; padding:11px; background:var(--danger); color:#fff; border:none; border-radius:8px; font-family:var(--font); font-size:0.9rem; font-weight:600; cursor:pointer;">
+          Go to Attendance History
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="loading-overlay" id="loadingOverlay"><div class="spinner"></div></div>
+
+<script type="module">
+import {
+  auth, db,
+  getUserProfile, logoutUser,
+  createClass, getTeacherClasses, deleteClass, updateClassName,
+  addDivision, getDivisions, deleteDivision, regenerateJoinCode,
+  addStudentsToDivision, getDivisionStudents, deleteStudent,
+  createSubject, getTeacherSubjects, deleteSubject, updateSubjectName,
+  saveAttendanceSession, getAttendanceSession, getSubjectAttendance, deleteAttendanceSession,
+  parseRollRange, formatDate, formatMonthLabel,
+  checkTamperOnLogin,
+  onAuthStateChanged
+} from "./firebase.js";
+
+import {
+  getDoc, doc, updateDoc
+} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+// ===== STATE =====
+let currentUser = null;
+let classes = [];
+let subjects = [];
+let activePage = "classes";
+
+// Attendance marking state
+let attStudents = []; // [{roll, docId}]
+let attRecords = {};  // {roll: "P"|"A"}
+
+// Session edit state
+let editSessionSubjectId = null;
+let editSessionDate = null;
+let editSessionRolls = [];
+let editSessionRecords = {};
+
+// Add class/division context
+let editingClassId = null;
+let editingDivId = null;
+
+function setLoading(v) {
+  document.getElementById("loadingOverlay").classList.toggle("show", v);
+}
+
+// ===== PROFILE DROPDOWN =====
+window.toggleProfileDropdown = function() {
+  document.getElementById("profileDropdown").classList.toggle("open");
+};
+// Close dropdown when clicking outside
+document.addEventListener("click", function(e) {
+  const wrap = document.getElementById("profileWrap");
+  if (wrap && !wrap.contains(e.target)) {
+    document.getElementById("profileDropdown").classList.remove("open");
+  }
+});
+
+// ===== AUTH GUARD =====
+onAuthStateChanged(auth, async (user) => {
+  if (!user) { window.location.href = "index.html"; return; }
+  if (!user.emailVerified) { window.location.href = "index.html"; return; }
+  const profile = await getUserProfile(user.uid);
+  if (!profile || profile.role !== "teacher") { window.location.href = "index.html"; return; }
+  currentUser = { ...user, profile };
+  // Fill profile dropdown
+  const name = profile.name || user.email;
+  const initials = name.trim().split(" ").map(w => w[0]).join("").toUpperCase().slice(0,2);
+  document.getElementById("profileAvatar").textContent = initials;
+  document.getElementById("profileBtnName").textContent = profile.name || "Teacher";
+  document.getElementById("pdName").textContent = profile.name || "Teacher";
+  document.getElementById("pdEmail").textContent = user.email;
+  await loadAllData();
+});
+
+async function loadAllData() {
+  setLoading(true);
+  classes = await getTeacherClasses(currentUser.uid);
+  subjects = await getTeacherSubjects(currentUser.uid);
+  renderClasses();
+  renderSubjectsPage();
+  populateSubjectDropdowns();
+  populateClassDropdowns();
+  populateExportDropdowns();
+  document.getElementById("attDate").value = new Date().toISOString().slice(0,10);
+  setLoading(false);
+
+  // Check for tampered attendance on login — shows every login until the tamper is fixed
+  if (subjects.length) {
+    const subjectIds = subjects.map(s => s.id);
+    const tampered = await checkTamperOnLogin(subjectIds);
+
+    if (tampered.length > 0) {
+      const rows = await Promise.all(tampered.map(async t => {
+        const subject = subjects.find(s => s.id === t.subjectId);
+        const subjectName = subject?.name || "Unknown Subject";
+        const classId    = subject?.classId;
+        const divisionId = subject?.divisionId;
+        const cls = classes.find(c => c.id === classId);
+        const className = cls?.name || "—";
+        let divisionName = "—";
+        if (classId && divisionId) {
+          try {
+            const divs = await getDivisions(classId);
+            divisionName = divs.find(d => d.id === divisionId)?.name || "—";
+          } catch(_) {}
+        }
+        // Only show rolls that are actually different from checksum
+        let changedRolls = "—";
+        try {
+          const session = await getAttendanceSession(t.subjectId, t.date);
+          if (session?.checksum && session?.records) {
+            // Recompute checksum to find mismatches per roll
+            const storedPairs = session.checksum.split("|").reduce((acc, pair) => {
+              const [r, s] = pair.split(":");
+              if (r) acc[r] = s;
+              return acc;
+            }, {});
+            const changed = Object.entries(session.records)
+              .filter(([roll, status]) => storedPairs[roll] !== status)
+              .map(([roll]) => roll);
+            // Also catch rolls deleted from records but in checksum
+            const deletedRolls = Object.keys(storedPairs)
+              .filter(r => !session.records[r]);
+            const allChanged = [...new Set([...changed, ...deletedRolls])]
+              .sort((a, b) => parseInt(a) - parseInt(b));
+            changedRolls = allChanged.length > 0 ? allChanged.join(", ") : "Unknown";
+          }
+        } catch(_) {}
+        return { subjectName, className, divisionName, date: t.date, changedRolls };
+      }));
+
+      document.getElementById("tamperDetailList").innerHTML = rows.map(r => `
+        <div style="background:var(--danger-light); border:1px solid #fca5a5; border-radius:8px; padding:12px 14px;">
+          <div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:6px;">
+            <span style="background:#fee2e2; color:var(--danger); font-size:0.75rem; font-weight:600; padding:2px 8px; border-radius:100px;">${r.className}</span>
+            <span style="background:#fee2e2; color:var(--danger); font-size:0.75rem; font-weight:600; padding:2px 8px; border-radius:100px;">${r.divisionName}</span>
+            <span style="background:#fee2e2; color:var(--danger); font-size:0.75rem; font-weight:600; padding:2px 8px; border-radius:100px;">${r.subjectName}</span>
+            <span style="background:#fee2e2; color:var(--danger); font-size:0.75rem; font-weight:600; padding:2px 8px; border-radius:100px;">${formatDate(r.date)}</span>
+          </div>
+          <div style="font-size:0.82rem; color:var(--text-2);">
+            <strong>Changed Rolls:</strong> ${r.changedRolls}
+          </div>
+        </div>`).join("");
+
+      document.getElementById("tamperOverlay").style.display = "flex";
+    }
+  }
+
+  // Start real-time listener for changes while logged in
+  startAuditListeners();
+}
+
+// ===== PAGE NAVIGATION =====
+window.showPage = function(page) {
+  activePage = page;
+  document.querySelectorAll(".page").forEach(p => p.classList.remove("active"));
+  document.getElementById(`page-${page}`).classList.add("active");
+  document.querySelectorAll(".sidebar-link").forEach(l => l.classList.remove("active"));
+  document.getElementById(`nav-${page}`).classList.add("active");
+  document.querySelectorAll(".mobile-nav-btn").forEach(b => b.classList.remove("active"));
+  const mb = document.getElementById(`mnav-${page}`);
+  if (mb) mb.classList.add("active");
+};
+
+// ===== LOGOUT =====
+window.handleLogout = async function() {
+  await logoutUser();
+  window.location.href = "index.html";
+};
+
+// ===== MODAL HELPERS =====
+window.openModal = function(id) {
+  document.getElementById(id).classList.add("open");
+};
+window.closeModal = function(id) {
+  document.getElementById(id).classList.remove("open");
+};
+
+// ===== CLASSES =====
+window.openAddClassModal = function() {
+  editingClassId = null;
+  document.getElementById("newClassName").value = "";
+  document.getElementById("addClassTitle").textContent = "Add New Class";
+  document.getElementById("saveClassBtn").textContent = "Add Class";
+  openModal("modalAddClass");
+};
+
+window.openEditClassModal = function(classId, name) {
+  editingClassId = classId;
+  document.getElementById("newClassName").value = name;
+  document.getElementById("addClassTitle").textContent = "Edit Class Name";
+  document.getElementById("saveClassBtn").textContent = "Save Changes";
+  openModal("modalAddClass");
+};
+
+window.handleSaveClass = async function() {
+  const name = document.getElementById("newClassName").value.trim();
+  if (!name) { alert("Please enter a class name."); return; }
+  setLoading(true);
+  if (editingClassId) {
+    await updateClassName(editingClassId, name);
+  } else {
+    await createClass(currentUser.uid, name);
+  }
+  closeModal("modalAddClass");
+  await loadAllData();
+};
+
+window.handleDeleteClass = async function(classId) {
+  if (!confirm("Delete this class? All divisions and data inside will also be removed.")) return;
+  setLoading(true);
+  await deleteClass(classId);
+  await loadAllData();
+};
+
+// ===== DIVISIONS =====
+window.openAddDivisionModal = function(classId) {
+  editingClassId = classId;
+  document.getElementById("newDivisionName").value = "";
+  openModal("modalAddDivision");
+};
+
+window.handleSaveDivision = async function() {
+  const name = document.getElementById("newDivisionName").value.trim();
+  if (!name) { alert("Please enter a division name."); return; }
+  setLoading(true);
+  await addDivision(editingClassId, name);
+  closeModal("modalAddDivision");
+  await loadAllData();
+};
+
+window.handleDeleteDivision = async function(classId, divId) {
+  if (!confirm("Delete this division?")) return;
+  setLoading(true);
+  await deleteDivision(classId, divId);
+  await loadAllData();
+};
+
+// ===== ROLL NUMBERS (from classes page) =====
+window.openAddRollsModal = function(classId, divId) {
+  editingClassId = classId;
+  editingDivId = divId;
+  document.getElementById("rollInput").value = "";
+  openModal("modalAddRolls");
+};
+
+window.handleSaveRolls = async function() {
+  const input = document.getElementById("rollInput").value.trim();
+  if (!input) { alert("Please enter roll numbers."); return; }
+  const rolls = parseRollRange(input);
+  if (!rolls.length) { alert("No valid roll numbers found."); return; }
+  setLoading(true);
+  await addStudentsToDivision(editingClassId, editingDivId, rolls);
+  closeModal("modalAddRolls");
+  await loadAllData();
+  // If we are on roll numbers page, refresh
+  if (document.getElementById("rollClass").value === editingClassId) {
+    document.getElementById("rollDivision").value = editingDivId;
+    loadRollNumbers();
+  }
+};
+
+// ===== RENDER CLASSES =====
+async function renderClasses() {
+  const list = document.getElementById("classesList");
+  if (!classes.length) {
+    list.innerHTML = `<div class="empty-state"><p>No classes yet. Click "New Class" to get started.</p></div>`;
+    return;
+  }
+  list.innerHTML = "";
+  for (const cls of classes) {
+    const divs = await getDivisions(cls.id);
+    const card = document.createElement("div");
+    card.className = "class-card";
+    card.innerHTML = `
+      <div class="class-card-head">
+        <div>
+          <h3 style="font-size:1rem;">${cls.name}</h3>
+        </div>
+        <div class="flex gap-2">
+          <button class="btn btn-ghost btn-sm" onclick="openEditClassModal('${cls.id}', '${cls.name.replace(/'/g,"\\'")}')">Edit</button>
+          <button class="btn btn-ghost btn-sm text-danger" onclick="handleDeleteClass('${cls.id}')">Delete</button>
+        </div>
+      </div>
+      <div class="class-card-body">
+        <div class="flex justify-between items-center mb-3">
+          <h4 class="text-sm">Divisions (${divs.length})</h4>
+          <button class="btn btn-secondary btn-sm" onclick="openAddDivisionModal('${cls.id}')">Add Division</button>
+        </div>
+        <div id="divList-${cls.id}">
+          ${divs.length === 0 ? `<p class="text-sm text-muted">No divisions yet.</p>` :
+            divs.map(d => `
+              <div class="div-row">
+                <div>
+                  <span class="font-semibold text-sm">${d.name}</span>
+                  <div style="display:flex; align-items:center; gap:6px; margin-top:4px;">
+                    <span class="text-xs text-muted">Join Code:</span>
+                    <span class="id-box" onclick="copyText('${d.joinCode || '------'}', this)" title="Click to copy join code" style="display:inline-flex; vertical-align:middle; font-size:0.9rem; font-weight:700; letter-spacing:0.1em; color:var(--accent);">
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                      ${d.joinCode || '------'}
+                    </span>
+                    <button class="btn btn-ghost btn-sm" style="padding:2px 6px; font-size:0.75rem;" onclick="handleRegenCode('${cls.id}','${d.id}',this)" title="Generate new code (old code will stop working)">Regenerate</button>
+                  </div>
+                </div>
+                <div class="flex gap-2">
+                  <button class="btn btn-ghost btn-sm" onclick="openAddRollsModal('${cls.id}', '${d.id}')">Add Rolls</button>
+                  <button class="btn btn-ghost btn-sm text-danger" onclick="handleDeleteDivision('${cls.id}','${d.id}')">Remove</button>
+                </div>
+              </div>
+            `).join("")
+          }
+        </div>
+      </div>
+    `;
+    list.appendChild(card);
+  }
+}
+
+window.copyText = function(text, el) {
+  navigator.clipboard.writeText(text).then(() => {
+    const orig = el.innerHTML;
+    el.innerHTML = `Copied!`;
+    setTimeout(() => { el.innerHTML = orig; }, 1200);
+  });
+};
+
+window.handleRegenCode = async function(classId, divId, btn) {
+  if (!confirm("Generate a new join code? The old code will stop working and students who have not joined yet will need the new code.")) return;
+  setLoading(true);
+  const newCode = await regenerateJoinCode(classId, divId);
+  setLoading(false);
+  // Find the code span next to this button and update it
+  const codeSpan = btn.previousElementSibling;
+  if (codeSpan) {
+    codeSpan.setAttribute("onclick", `copyText('${newCode}', this)`);
+    codeSpan.childNodes[codeSpan.childNodes.length - 1].textContent = ` ${newCode}`;
+  }
+  alert("New join code generated: " + newCode);
+};
+
+// ===== SUBJECTS =====
+window.handleAddSubject = async function() {
+  const classId = document.getElementById("subjectClass").value;
+  const divisionId = document.getElementById("subjectDivision").value;
+  const name = document.getElementById("subjectName").value.trim();
+  if (!classId || !divisionId || !name) { alert("Please fill all fields."); return; }
+  setLoading(true);
+  await createSubject(currentUser.uid, classId, divisionId, name);
+  document.getElementById("subjectName").value = "";
+  await loadAllData();
+};
+
+window.handleDeleteSubject = async function(id) {
+  if (!confirm("Delete this subject and all its attendance data?")) return;
+  setLoading(true);
+  await deleteSubject(id);
+  await loadAllData();
+};
+
+window.handleEditSubject = async function(id, oldName) {
+  const name = prompt("Enter new subject name:", oldName);
+  if (!name || !name.trim()) return;
+  setLoading(true);
+  await updateSubjectName(id, name.trim());
+  await loadAllData();
+};
+
+function renderSubjectsPage() {
+  const list = document.getElementById("subjectsList");
+  if (!subjects.length) {
+    list.innerHTML = `<div class="empty-state"><p>No subjects yet.</p></div>`;
+    return;
+  }
+  const classMap = {};
+  classes.forEach(c => classMap[c.id] = c.name);
+  list.innerHTML = `<div style="display:flex; flex-direction:column; gap:10px;">
+    ${subjects.map(s => {
+      const cls = classMap[s.classId] || s.classId;
+      return `
+        <div style="display:flex; align-items:center; justify-content:space-between; padding:10px 0; border-bottom:1px solid var(--border);">
+          <div>
+            <span class="font-semibold">${s.name}</span>
+            <span class="text-xs text-muted" style="margin-left:8px;">Class: ${cls}</span>
+          </div>
+          <div class="flex gap-2">
+            <button class="btn btn-ghost btn-sm" onclick="handleEditSubject('${s.id}','${s.name.replace(/'/g,"\\'")}')">Edit</button>
+            <button class="btn btn-ghost btn-sm text-danger" onclick="handleDeleteSubject('${s.id}')">Delete</button>
+          </div>
+        </div>`;
+    }).join("")}
+  </div>`;
+}
+
+// ===== POPULATE DROPDOWNS =====
+function populateSubjectDropdowns() {
+  const classMap = {};
+  classes.forEach(c => classMap[c.id] = c.name);
+
+  // Subject page class dropdown
+  const sc = document.getElementById("subjectClass");
+  const sv = sc.value;
+  sc.innerHTML = `<option value="">Choose class...</option>` +
+    classes.map(c => `<option value="${c.id}">${c.name}</option>`).join("");
+  if (sv) sc.value = sv;
+
+  // Attendance subject dropdown
+  const attSub = document.getElementById("attSubject");
+  const attV = attSub.value;
+  attSub.innerHTML = `<option value="">Choose subject...</option>` +
+    subjects.map(s => `<option value="${s.id}">${s.name} (${classMap[s.classId] || s.classId})</option>`).join("");
+  if (attV) attSub.value = attV;
+
+  // History subject dropdown
+  const histSub = document.getElementById("histSubject");
+  const histV = histSub.value;
+  histSub.innerHTML = `<option value="">Choose subject...</option>` +
+    subjects.map(s => `<option value="${s.id}">${s.name} (${classMap[s.classId] || s.classId})</option>`).join("");
+  if (histV) histSub.value = histV;
+}
+
+function populateClassDropdowns() {
+  const rc = document.getElementById("rollClass");
+  const rv = rc.value;
+  rc.innerHTML = `<option value="">Choose class...</option>` +
+    classes.map(c => `<option value="${c.id}">${c.name}</option>`).join("");
+  if (rv) rc.value = rv;
+}
+
+window.loadDivisionsForSubject = async function() {
+  const classId = document.getElementById("subjectClass").value;
+  const sel = document.getElementById("subjectDivision");
+  sel.innerHTML = `<option value="">Choose division...</option>`;
+  if (!classId) return;
+  const divs = await getDivisions(classId);
+  divs.forEach(d => {
+    const o = document.createElement("option");
+    o.value = d.id;
+    o.textContent = d.name;
+    sel.appendChild(o);
+  });
+};
+
+window.loadDivisionsForRoll = async function() {
+  const classId = document.getElementById("rollClass").value;
+  const sel = document.getElementById("rollDivision");
+  sel.innerHTML = `<option value="">Choose division...</option>`;
+  document.getElementById("rollsContent").innerHTML = `<div class="empty-state"><p>Select a class and division.</p></div>`;
+  if (!classId) return;
+  const divs = await getDivisions(classId);
+  divs.forEach(d => {
+    const o = document.createElement("option");
+    o.value = d.id;
+    o.textContent = d.name;
+    sel.appendChild(o);
+  });
+};
+
+window.loadRollNumbers = async function() {
+  const classId = document.getElementById("rollClass").value;
+  const divId = document.getElementById("rollDivision").value;
+  const wrap = document.getElementById("rollsContent");
+  if (!classId || !divId) {
+    wrap.innerHTML = `<div class="empty-state"><p>Select class and division.</p></div>`;
+    document.getElementById("rollAttFilter").style.display = "none";
+    return;
+  }
+  setLoading(true);
+  const students = await getDivisionStudents(classId, divId);
+  setLoading(false);
+
+  if (!students.length) {
+    wrap.innerHTML = `<div class="card"><div class="card-body">
+      <div class="empty-state"><p>No roll numbers added yet.</p></div>
+      <div style="text-align:center; margin-top:12px;">
+        <button class="btn btn-primary btn-sm" onclick="openAddRollsModal('${classId}','${divId}')">Add Roll Numbers</button>
+      </div>
+    </div></div>`;
+    document.getElementById("rollAttFilter").style.display = "none";
+    return;
+  }
+
+  // Populate subject dropdown with only this teacher's subjects for this division
+  const divSubjects = subjects.filter(s => s.classId === classId && s.divisionId === divId);
+  const subjectSel = document.getElementById("rollAttSubject");
+  subjectSel.innerHTML = `<option value="">Choose subject...</option>` +
+    divSubjects.map(s => `<option value="${s.id}">${s.name}</option>`).join("");
+
+  // Set current month as default
+  const now = new Date();
+  document.getElementById("rollAttMonth").value =
+    `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+
+  document.getElementById("rollAttFilter").style.display = "block";
+
+  // Store for reuse
+  window._rollStudents = students;
+  window._rollClassId = classId;
+  window._rollDivId = divId;
+
+  await renderRollTable({});
+};
+
+// Render roll table. attMap = { roll: pct } or {} for no attendance column
+async function renderRollTable(attMap) {
+  const classId = window._rollClassId;
+  const divId = window._rollDivId;
+  const students = window._rollStudents || [];
+  const wrap = document.getElementById("rollsContent");
+  const hasAtt = Object.keys(attMap).length > 0;
+
+  const sorted = [...students].sort((a, b) => parseInt(a.roll) - parseInt(b.roll));
+
+  // Fetch names for linked students
+  const nameMap = {};
+  await Promise.all(sorted.filter(s => s.uid).map(async s => {
+    try {
+      const userSnap = await getDoc(doc(db, "users", s.uid));
+      if (userSnap.exists()) {
+        nameMap[s.uid] = userSnap.data().name || userSnap.data().email || "Unknown";
+      }
+    } catch(_) {}
+  }));
+
+  wrap.innerHTML = `
+    <div class="card">
+      <div class="card-header">
+        <h3>Roll Numbers (${students.length} students)</h3>
+        <button class="btn btn-primary btn-sm" onclick="openAddRollsModal('${classId}','${divId}')">Add More</button>
+      </div>
+      <div class="card-body" style="padding:0;">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Roll No.</th>
+                <th>Student</th>
+                ${hasAtt ? `<th style="text-align:center;">Attendance %</th>` : ""}
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${sorted.map(s => {
+                const pct = attMap[s.roll];
+                let attCell = "";
+                if (hasAtt) {
+                  const badgeCls = pct >= 75 ? "badge-green" : pct >= 60 ? "badge-yellow" : "badge-red";
+                  attCell = `<td style="text-align:center;"><span class="badge ${badgeCls}">${pct}%</span></td>`;
+                }
+                return `<tr>
+                  <td><span class="font-semibold">${s.roll}</span></td>
+                  <td>
+                    ${s.uid
+                      ? `<span class="font-semibold text-sm">${nameMap[s.uid] || 'Unknown'}</span>
+                         <span class="badge badge-green" style="margin-left:6px;">Linked</span>`
+                      : `<span class="badge badge-red">Not linked</span>`}
+                  </td>
+                  ${attCell}
+                  <td>
+                    <button class="btn btn-ghost btn-sm text-danger" onclick="handleDeleteRoll('${classId}','${divId}','${s.id}')">Remove</button>
+                  </td>
+                </tr>`;
+              }).join("")}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>`;
+}
+
+// Calculate per-roll attendance % for the selected subject and month
+window.loadRollAttendance = async function() {
+  const subjectId = document.getElementById("rollAttSubject").value;
+  const month = document.getElementById("rollAttMonth").value; // "YYYY-MM"
+  if (!subjectId || !month) {
+    await renderRollTable({});
+    return;
+  }
+  setLoading(true);
+
+  // Get all sessions for this subject
+  const allSessions = await getSubjectAttendance(subjectId);
+
+  // Keep only sessions in the selected month
+  const monthSessions = allSessions.filter(s => s.date && s.date.startsWith(month));
+
+  const students = window._rollStudents || [];
+
+  if (!monthSessions.length) {
+    setLoading(false);
+    // No sessions that month — everyone shows 0%
+    const emptyMap = {};
+    students.forEach(s => { emptyMap[s.roll] = 0; });
+    await renderRollTable(emptyMap);
+    return;
+  }
+
+  // Tally present and total per roll number across all sessions that month
+  const presentCount = {};
+  const totalCount = {};
+  for (const session of monthSessions) {
+    for (const [roll, status] of Object.entries(session.records || {})) {
+      if (!totalCount[roll]) { totalCount[roll] = 0; presentCount[roll] = 0; }
+      totalCount[roll]++;
+      if (status === "P") presentCount[roll]++;
+    }
+  }
+
+  // Build attMap { roll: pct }
+  const attMap = {};
+  students.forEach(s => {
+    const total = totalCount[s.roll] || 0;
+    const present = presentCount[s.roll] || 0;
+    attMap[s.roll] = total === 0 ? 0 : parseFloat(((present / total) * 100).toFixed(2));
+  });
+
+  setLoading(false);
+  await renderRollTable(attMap);
+};
+
+window.handleDeleteRoll = async function(classId, divId, docId) {
+  if (!confirm("Remove this roll number?")) return;
+  setLoading(true);
+  await deleteStudent(classId, divId, docId);
+  await loadRollNumbers();
+};
+
+// ===== ATTENDANCE MARKING =====
+window.loadAttendanceGrid = async function() {
+  const subjectId = document.getElementById("attSubject").value;
+  const date = document.getElementById("attDate").value;
+  const wrap = document.getElementById("attGridWrap");
+  if (!subjectId || !date) {
+    wrap.innerHTML = `<div class="empty-state"><p>Select a subject and date to start marking attendance.</p></div>`;
+    return;
+  }
+  setLoading(true);
+  // Get subject info
+  const subject = subjects.find(s => s.id === subjectId);
+  if (!subject) { setLoading(false); return; }
+  // Get students in division
+  const students = await getDivisionStudents(subject.classId, subject.divisionId);
+  attStudents = students.sort((a,b) => parseInt(a.roll) - parseInt(b.roll));
+  // Load existing session
+  const session = await getAttendanceSession(subjectId, date);
+  attRecords = session ? { ...session.records } : {};
+  // Initialize missing
+  attStudents.forEach(s => {
+    if (!attRecords[s.roll]) attRecords[s.roll] = "A";
+  });
+  setLoading(false);
+  renderAttGrid(wrap);
+};
+
+function renderAttGrid(wrap) {
+  if (!attStudents.length) {
+    wrap.innerHTML = `<div class="empty-state"><p>No students found in this division. Add roll numbers first.</p></div>`;
+    return;
+  }
+  const total = attStudents.length;
+  const presentCount = Object.values(attRecords).filter(v => v === "P").length;
+  wrap.innerHTML = `
+    <div style="margin-bottom: 12px;" class="flex gap-3 flex-wrap">
+      <span class="badge badge-blue">Total: ${total}</span>
+      <span class="badge badge-green">Present: ${presentCount}</span>
+      <span class="badge badge-red">Absent: ${total - presentCount}</span>
+    </div>
+    <div class="att-mark-grid" id="attCellGrid">
+      ${attStudents.map(s => {
+        const status = attRecords[s.roll] || "A";
+        return `<div class="att-mark-cell ${status === 'P' ? 'present' : 'absent'}" 
+          onclick="toggleCell('${s.roll}')" data-roll="${s.roll}">
+          <div class="roll-num">${s.roll}</div>
+          <div class="status-badge">${status === 'P' ? 'P' : 'A'}</div>
+        </div>`;
+      }).join("")}
+    </div>`;
+}
+
+window.toggleCell = function(roll) {
+  attRecords[roll] = attRecords[roll] === "P" ? "A" : "P";
+  const cell = document.querySelector(`[data-roll="${roll}"]`);
+  if (cell) {
+    const status = attRecords[roll];
+    cell.className = `att-mark-cell ${status === "P" ? "present" : "absent"}`;
+    cell.querySelector(".status-badge").textContent = status;
+  }
+  // Update counts
+  const total = attStudents.length;
+  const presentCount = Object.values(attRecords).filter(v => v === "P").length;
+  const badges = document.querySelectorAll(".badge");
+  if (badges[1]) badges[1].textContent = `Present: ${presentCount}`;
+  if (badges[2]) badges[2].textContent = `Absent: ${total - presentCount}`;
+};
+
+window.markAll = function(status) {
+  attStudents.forEach(s => {
+    attRecords[s.roll] = status;
+    const cell = document.querySelector(`[data-roll="${s.roll}"]`);
+    if (cell) {
+      cell.className = `att-mark-cell ${status === "P" ? "present" : "absent"}`;
+      cell.querySelector(".status-badge").textContent = status;
+    }
+  });
+  const total = attStudents.length;
+  const presentCount = status === "P" ? total : 0;
+  const badges = document.querySelectorAll(".badge");
+  if (badges[1]) badges[1].textContent = `Present: ${presentCount}`;
+  if (badges[2]) badges[2].textContent = `Absent: ${total - presentCount}`;
+};
+
+window.saveAttendance = async function() {
+  const subjectId = document.getElementById("attSubject").value;
+  const date = document.getElementById("attDate").value;
+  if (!subjectId || !date) { alert("Please select a subject and date."); return; }
+  if (!attStudents.length) { alert("No students found."); return; }
+  setLoading(true);
+  markLocalWrite(`${subjectId}_${date}`);
+  await saveAttendanceSession(subjectId, date, attRecords);
+  setLoading(false);
+  openModal("modalSaveSuccess");
+};
+
+// ===== HISTORY =====
+window.loadHistory = async function() {
+  const subjectId = document.getElementById("histSubject").value;
+  const list = document.getElementById("historyList");
+  if (!subjectId) { list.innerHTML = `<div class="empty-state"><p>Select a subject.</p></div>`; return; }
+  setLoading(true);
+  const sessions = await getSubjectAttendance(subjectId);
+  setLoading(false);
+  if (!sessions.length) {
+    list.innerHTML = `<div class="empty-state"><p>No attendance sessions recorded for this subject.</p></div>`;
+    return;
+  }
+  sessions.sort((a,b) => b.date.localeCompare(a.date));
+  const subject = subjects.find(s => s.id === subjectId);
+  list.innerHTML = `
+    <div class="card">
+      <div class="card-header"><h3>Sessions for ${subject?.name || ''}</h3></div>
+      <div class="card-body" style="padding: 0;">
+        <div class="table-wrap" style="border:none; border-radius:0;">
+          <table>
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Present</th>
+                <th>Absent</th>
+                <th>Total</th>
+                <th style="text-align:center; width:160px;">Actions</th>
+                <th style="text-align:center; width:80px;">View</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${sessions.map(s => {
+                const rolls = Object.keys(s.records || {});
+                const present = Object.values(s.records || {}).filter(v => v === "P").length;
+                const total = rolls.length;
+                return `<tr>
+                  <td>${formatDate(s.date)}</td>
+                  <td><span class="badge badge-green">${present}</span></td>
+                  <td><span class="badge badge-red">${total - present}</span></td>
+                  <td>${total}</td>
+                  <td style="text-align:center;">
+                    <div style="display:inline-flex; gap:6px; align-items:center;">
+                      <button class="btn btn-ghost btn-sm" onclick="openSessionEdit('${subjectId}','${s.date}')">Edit</button>
+                      <button class="btn btn-ghost btn-sm text-danger" onclick="deleteHistSession('${subjectId}','${s.date}')">Delete</button>
+                    </div>
+                  </td>
+                  <td style="text-align:center;">
+                    <button class="btn btn-secondary btn-sm" onclick="viewSession('${subjectId}','${s.date}')">View</button>
+                  </td>
+                </tr>`;
+              }).join("")}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>`;
+};
+
+window.viewSession = async function(subjectId, date) {
+  setLoading(true);
+  const session = await getAttendanceSession(subjectId, date);
+  setLoading(false);
+  if (!session) { alert("Session not found."); return; }
+
+  const records = session.records || {};
+  const present = Object.entries(records)
+    .filter(([, s]) => s === "P").map(([r]) => r)
+    .sort((a, b) => parseInt(a) - parseInt(b));
+  const absent = Object.entries(records)
+    .filter(([, s]) => s === "A").map(([r]) => r)
+    .sort((a, b) => parseInt(a) - parseInt(b));
+
+  const subject = subjects.find(s => s.id === subjectId);
+  document.getElementById("viewSessionTitle").textContent =
+    `${subject?.name || "Session"} — ${formatDate(date)}`;
+  document.getElementById("viewSessionBody").innerHTML = `
+    <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:16px;">
+      <span class="badge badge-blue">Total: ${present.length + absent.length}</span>
+      <span class="badge badge-green">Present: ${present.length}</span>
+      <span class="badge badge-red">Absent: ${absent.length}</span>
+    </div>
+    <div class="grid-2" style="gap: 16px; align-items:start;">
+      <div>
+        <h4 style="color:var(--success); margin-bottom:10px; font-size:0.9rem;">
+          ✓ Present (${present.length})
+        </h4>
+        <div class="chip-group">
+          ${present.length
+            ? present.map(r => `<span class="chip selected" style="cursor:default;">${r}</span>`).join("")
+            : `<p class="text-sm text-muted">Nobody present</p>`}
+        </div>
+      </div>
+      <div>
+        <h4 style="color:var(--danger); margin-bottom:10px; font-size:0.9rem;">
+          ✗ Absent (${absent.length})
+        </h4>
+        <div class="chip-group">
+          ${absent.length
+            ? absent.map(r => `<span class="chip" style="background:var(--danger-light);border-color:#fca5a5;color:var(--danger);cursor:default;">${r}</span>`).join("")
+            : `<p class="text-sm text-muted">Nobody absent</p>`}
+        </div>
+      </div>
+    </div>`;
+  openModal("modalViewSession");
+};
+
+window.deleteHistSession = async function(subjectId, date) {
+  if (!confirm("Delete this attendance session?")) return;
+  setLoading(true);
+  markLocalWrite(`${subjectId}_${date}`);
+  await deleteAttendanceSession(subjectId, date);
+  await loadHistory();
+};
+
+window.openSessionEdit = async function(subjectId, date) {
+  setLoading(true);
+  const session = await getAttendanceSession(subjectId, date);
+  setLoading(false);
+  if (!session) { alert("Session not found."); return; }
+  editSessionSubjectId = subjectId;
+  editSessionDate = date;
+  editSessionRecords = { ...session.records };
+  editSessionRolls = Object.keys(session.records).sort((a,b) => parseInt(a) - parseInt(b));
+  document.getElementById("sessionModalTitle").textContent = `Edit: ${formatDate(date)}`;
+  renderSessionGrid();
+  openModal("modalSession");
+};
+
+function renderSessionGrid() {
+  const grid = document.getElementById("sessionGrid");
+  grid.innerHTML = editSessionRolls.map(roll => {
+    const status = editSessionRecords[roll] || "A";
+    return `<div class="att-mark-cell ${status === 'P' ? 'present' : 'absent'}" 
+      onclick="toggleSessionCell('${roll}')" data-sroll="${roll}">
+      <div class="roll-num">${roll}</div>
+      <div class="status-badge">${status === 'P' ? 'P' : 'A'}</div>
+    </div>`;
+  }).join("");
+}
+
+window.toggleSessionCell = function(roll) {
+  editSessionRecords[roll] = editSessionRecords[roll] === "P" ? "A" : "P";
+  const cell = document.querySelector(`[data-sroll="${roll}"]`);
+  if (cell) {
+    const status = editSessionRecords[roll];
+    cell.className = `att-mark-cell ${status === "P" ? "present" : "absent"}`;
+    cell.querySelector(".status-badge").textContent = status;
+  }
+};
+
+window.sessionMarkAll = function(status) {
+  editSessionRolls.forEach(roll => {
+    editSessionRecords[roll] = status;
+    const cell = document.querySelector(`[data-sroll="${roll}"]`);
+    if (cell) {
+      cell.className = `att-mark-cell ${status === "P" ? "present" : "absent"}`;
+      cell.querySelector(".status-badge").textContent = status;
+    }
+  });
+};
+
+window.saveSessionEdit = async function() {
+  setLoading(true);
+  markLocalWrite(`${editSessionSubjectId}_${editSessionDate}`);
+  await saveAttendanceSession(editSessionSubjectId, editSessionDate, editSessionRecords);
+  closeModal("modalSession");
+  await loadHistory();
+  setLoading(false);
+};
+
+window.deleteSession = async function() {
+  if (!confirm("Delete this session permanently?")) return;
+  setLoading(true);
+  markLocalWrite(`${editSessionSubjectId}_${editSessionDate}`);
+  await deleteAttendanceSession(editSessionSubjectId, editSessionDate);
+  closeModal("modalSession");
+  await loadHistory();
+  setLoading(false);
+};
+
+// Close modal on backdrop click
+document.querySelectorAll(".modal-backdrop").forEach(backdrop => {
+  backdrop.addEventListener("click", e => {
+    if (e.target === backdrop) backdrop.classList.remove("open");
+  });
+});
+
+// ===== SHEETJS EXCEL EXPORT =====
+// xlsx-js-style: drop-in replacement for SheetJS that supports cell font colours
+const sheetScript = document.createElement("script");
+sheetScript.src = "https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js";
+document.head.appendChild(sheetScript);
+
+// Colour constants — your requested colours
+const GREEN = "FF06AA35";  // #06AA35 — present / >= 75%
+const RED   = "FFFF0000";  // #FF0000 — absent  / < 75%
+const WHITE = "FFFFFFFF";
+const BLUE  = "FF2C5282";  // header background
+
+// Helper: format date "YYYY-MM-DD" -> "DD Mon YYYY"
+function fmtDate(d) {
+  if (!d) return "";
+  const [y, m, dd] = d.split("-");
+  const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  return `${dd} ${months[parseInt(m)-1]} ${y}`;
+}
+
+function getClassName(classId) {
+  const cls = classes.find(c => c.id === classId);
+  return cls ? cls.name : classId;
+}
+
+async function getDivisionName(classId, divisionId) {
+  const divs = await getDivisions(classId);
+  const d = divs.find(x => x.id === divisionId);
+  return d ? d.name : divisionId;
+}
+
+// Apply blue header style to a cell
+function styleHeader(ws, addr) {
+  if (!ws[addr]) return;
+  ws[addr].s = {
+    font: { bold: true, color: { rgb: WHITE }, sz: 11 },
+    fill: { fgColor: { rgb: BLUE } },
+    alignment: { horizontal: "center", vertical: "center" }
+  };
+}
+
+// Apply P (green) or A (red) font colour to a cell
+function stylePA(ws, addr, value) {
+  if (!ws[addr]) return;
+  ws[addr].s = {
+    font: { bold: true, color: { rgb: value === "P" ? GREEN : RED } },
+    alignment: { horizontal: "center", vertical: "center" }
+  };
+}
+
+// Apply % font colour: green if >= 75, red if < 75
+function stylePct(ws, addr, pctNum) {
+  if (!ws[addr]) return;
+  ws[addr].s = {
+    font: { bold: true, color: { rgb: pctNum >= 75 ? GREEN : RED } },
+    alignment: { horizontal: "center", vertical: "center" }
+  };
+}
+
+// ===== SINGLE SESSION DOWNLOAD (after saving attendance) =====
+window.downloadSessionExcel = async function() {
+  closeModal("modalSaveSuccess");
+  const subjectId = document.getElementById("attSubject").value;
+  const date      = document.getElementById("attDate").value;
+  if (!subjectId || !date) return;
+
+  const subject = subjects.find(s => s.id === subjectId);
+  if (!subject) return;
+
+  setLoading(true);
+
+  // Fetch student names
+  const students = attStudents;
+  const nameMap = {};
+  await Promise.all(students.filter(s => s.uid).map(async s => {
+    try {
+      const snap = await getDoc(doc(db, "users", s.uid));
+      if (snap.exists()) nameMap[s.uid] = snap.data().name || "";
+    } catch(_) {}
+  }));
+
+  const className = getClassName(subject.classId);
+  const divName   = await getDivisionName(subject.classId, subject.divisionId);
+  const sorted    = [...students].sort((a,b) => parseInt(a.roll) - parseInt(b.roll));
+
+  // Build data rows
+  const wsData = [["Name", "Roll Number", `Date: ${fmtDate(date)}`]];
+  sorted.forEach(s => {
+    const status = attRecords[s.roll] || "A";
+    const name   = nameMap[s.uid] || (s.uid ? "Linked" : "Not linked");
+    wsData.push([name, parseInt(s.roll), status]);
+  });
+
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet(wsData);
+  ws["!cols"] = [{ wch: 26 }, { wch: 14 }, { wch: 18 }];
+
+  // Style header row
+  ["A1", "B1", "C1"].forEach(addr => styleHeader(ws, addr));
+
+  // Style P / A cells in column C
+  sorted.forEach((_, i) => {
+    const addr = `C${i + 2}`;
+    const cell = ws[addr];
+    if (!cell) return;
+    stylePA(ws, addr, cell.v);
+  });
+
+  XLSX.utils.book_append_sheet(wb, ws, "Attendance");
+  XLSX.writeFile(wb, `${className}(${divName}) ${subject.name} ${fmtDate(date)}.xlsx`);
+  setLoading(false);
+};
+
+// ===== EXPORT PAGE =====
+window.loadExportDivisions = async function() {
+  const classId = document.getElementById("exportClass").value;
+  const subjectSel = document.getElementById("exportSubject");
+  subjectSel.innerHTML = `<option value="">Choose subject...</option>`;
+  if (!classId) return;
+  // Only show this teacher's subjects for this class
+  const classSubjects = subjects.filter(s => s.classId === classId);
+  classSubjects.forEach(s => {
+    const o = document.createElement("option");
+    o.value = s.id;
+    o.textContent = s.name;
+    subjectSel.appendChild(o);
+  });
+};
+
+// Populate export class dropdown (called from populateClassDropdowns)
+function populateExportDropdowns() {
+  const ec = document.getElementById("exportClass");
+  const ev = ec.value;
+  ec.innerHTML = `<option value="">Choose class...</option>` +
+    classes.map(c => `<option value="${c.id}">${c.name}</option>`).join("");
+  if (ev) ec.value = ev;
+
+  // Default month = current
+  const now = new Date();
+  document.getElementById("exportMonth").value =
+    `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}`;
+}
+
+// ===== FULL CLASS REPORT DOWNLOAD =====
+window.downloadClassReport = async function() {
+  const classId   = document.getElementById("exportClass").value;
+  const subjectId = document.getElementById("exportSubject").value;
+  const month     = document.getElementById("exportMonth").value;
+  if (!classId || !subjectId || !month) { alert("Please select a class, subject, and month."); return; }
+
+  const subject = subjects.find(s => s.id === subjectId);
+  if (!subject) return;
+
+  setLoading(true);
+
+  const className   = getClassName(classId);
+  const divs        = await getDivisions(classId);
+  const allSessions = await getSubjectAttendance(subjectId);
+  const monthSess   = allSessions
+    .filter(s => s.date && s.date.startsWith(month))
+    .sort((a, b) => a.date.localeCompare(b.date));
+
+  const wb = XLSX.utils.book_new();
+
+  for (const div of divs) {
+    const students = await getDivisionStudents(classId, div.id);
+    const sorted   = [...students].sort((a, b) => parseInt(a.roll) - parseInt(b.roll));
+
+    // Fetch names
+    const nameMap = {};
+    await Promise.all(sorted.filter(s => s.uid).map(async s => {
+      try {
+        const snap = await getDoc(doc(db, "users", s.uid));
+        if (snap.exists()) nameMap[s.uid] = snap.data().name || "";
+      } catch(_) {}
+    }));
+
+    // Build data
+    const dateHdrs = monthSess.map(s => fmtDate(s.date));
+    const header   = ["Name", "Roll Number", ...dateHdrs, "Overall %"];
+    const wsData   = [header];
+
+    sorted.forEach(s => {
+      const name = nameMap[s.uid] || (s.uid ? "Linked" : "—");
+      let present = 0, total = 0;
+      const statuses = monthSess.map(session => {
+        const st = session.records?.[s.roll];
+        if (st) { total++; if (st === "P") present++; }
+        return st || "—";
+      });
+      const pctNum = total > 0 ? parseFloat(((present / total) * 100).toFixed(2)) : null;
+      const pctStr = pctNum !== null ? pctNum + "%" : "—";
+      wsData.push([name, parseInt(s.roll), ...statuses, pctStr]);
+    });
+
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+    ws["!cols"] = [
+      { wch: 24 }, { wch: 12 },
+      ...dateHdrs.map(() => ({ wch: 12 })),
+      { wch: 13 }
+    ];
+
+    // Style header row
+    header.forEach((_, ci) => {
+      styleHeader(ws, XLSX.utils.encode_cell({ r: 0, c: ci }));
+    });
+
+    // Style each student row
+    sorted.forEach((_, ri) => {
+      const row = ri + 1; // row 0 = header
+
+      // P / A cells
+      monthSess.forEach((_, ci) => {
+        const addr = XLSX.utils.encode_cell({ r: row, c: ci + 2 });
+        const cell = ws[addr];
+        if (!cell || cell.v === "—") return;
+        stylePA(ws, addr, cell.v);
+      });
+
+      // Overall % cell
+      const pctAddr = XLSX.utils.encode_cell({ r: row, c: monthSess.length + 2 });
+      const pctCell = ws[pctAddr];
+      if (pctCell && pctCell.v !== "—") {
+        stylePct(ws, pctAddr, parseFloat(pctCell.v));
+      }
+    });
+
+    XLSX.utils.book_append_sheet(wb, ws, div.name.slice(0, 31));
+  }
+
+  if (wb.SheetNames.length === 0) {
+    alert("No divisions found for this class.");
+    setLoading(false);
+    return;
+  }
+
+  const [year, mon] = month.split("-");
+  const mNames = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  XLSX.writeFile(wb, `${className} ${subject.name} ${mNames[parseInt(mon)-1]} ${year}.xlsx`);
+  setLoading(false);
+};
+
+
+// Dismiss tamper alert
+// Uses sessionStorage so same tamper can show again in next browser session
+window.dismissTamperAlert = function() {
+  document.getElementById("tamperOverlay").style.display = "none";
+  document.getElementById("tamperDetailList").innerHTML = "";
+  sessionStorage.removeItem(`tamperActive_${currentUser.uid}`);
+};
+
+// ===== AUDIT / TAMPER DETECTION =====
+let auditListeners = [];
+let localWriteKeys = new Set();
+
+// Snapshot of records at last known state — used to diff what actually changed
+const knownRecords = {};
+
+window.markLocalWrite = function(key) {
+  localWriteKeys.add(key);
+  setTimeout(() => localWriteKeys.delete(key), 10000);
+};
+
+function startAuditListeners() {
+  subjects.forEach(subject => {
+    const q = window._firestoreQuery(
+      window._firestoreCollection(db, "attendance"),
+      window._firestoreWhere("subjectId", "==", subject.id)
+    );
+
+    const unsub = window._firestoreOnSnapshot(q, async (snapshot) => {
+      for (const change of snapshot.docChanges()) {
+
+        // On first load — just store initial state, never alert
+        if (change.type === "added") {
+          knownRecords[change.doc.id] = { ...(change.doc.data().records || {}) };
+          continue;
+        }
+
+        if (change.type === "modified" || change.type === "removed") {
+          const sessionId = change.doc.id;
+
+          // If THIS browser wrote it — update known state and skip
+          if (localWriteKeys.has(sessionId)) {
+            if (change.type === "modified") {
+              knownRecords[sessionId] = { ...(change.doc.data().records || {}) };
+            } else {
+              delete knownRecords[sessionId];
+            }
+            continue;
+          }
+
+          // Diff to find which specific rolls changed
+          let changedRolls = [];
+          if (change.type === "removed") {
+            changedRolls = Object.keys(knownRecords[sessionId] || {});
+          } else {
+            const newRecords = change.doc.data().records || {};
+            const oldRecords = knownRecords[sessionId] || {};
+            const allRolls = new Set([...Object.keys(newRecords), ...Object.keys(oldRecords)]);
+            for (const roll of allRolls) {
+              if (newRecords[roll] !== oldRecords[roll]) changedRolls.push(roll);
+            }
+            // Update known state
+            knownRecords[sessionId] = { ...newRecords };
+          }
+
+          if (changedRolls.length === 0) continue;
+
+          // Use sessionStorage so same session can't spam
+          // but a new browser session (next visit) will show again if still tampered
+          const activeKey = `tamperActive_${currentUser.uid}`;
+          const active = JSON.parse(sessionStorage.getItem(activeKey) || "[]");
+          // Each unique change event gets its own timestamped key
+          const alertKey = `${sessionId}_${Date.now()}`;
+          // Allow same session to be shown again (don't block by sessionId)
+          active.push(alertKey);
+          sessionStorage.setItem(activeKey, JSON.stringify(active));
+
+          const data = change.doc.data();
+          const cls = classes.find(c => c.id === subject.classId);
+          const className = cls?.name || "—";
+          let divisionName = "—";
+          try {
+            const divs = await getDivisions(subject.classId);
+            divisionName = divs.find(d => d.id === subject.divisionId)?.name || "—";
+          } catch(_) {}
+
+          const rollsDisplay = changedRolls
+            .sort((a, b) => parseInt(a) - parseInt(b))
+            .join(", ");
+
+          const listEl = document.getElementById("tamperDetailList");
+          // Append so multiple consecutive changes all show
+          listEl.innerHTML += `
+            <div style="background:var(--danger-light); border:1px solid #fca5a5; border-radius:8px; padding:12px 14px; margin-bottom:4px;">
+              <div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:6px;">
+                <span style="background:#fee2e2; color:var(--danger); font-size:0.75rem; font-weight:600; padding:2px 8px; border-radius:100px;">${className}</span>
+                <span style="background:#fee2e2; color:var(--danger); font-size:0.75rem; font-weight:600; padding:2px 8px; border-radius:100px;">${divisionName}</span>
+                <span style="background:#fee2e2; color:var(--danger); font-size:0.75rem; font-weight:600; padding:2px 8px; border-radius:100px;">${subject.name}</span>
+                <span style="background:#fee2e2; color:var(--danger); font-size:0.75rem; font-weight:600; padding:2px 8px; border-radius:100px;">${data?.date ? formatDate(data.date) : "—"}</span>
+                <span style="background:#fee2e2; color:var(--danger); font-size:0.75rem; font-weight:600; padding:2px 8px; border-radius:100px;">${change.type === "removed" ? "Deleted" : "Modified"}</span>
+              </div>
+              <div style="font-size:0.82rem; color:var(--text-2);">
+                <strong>Changed Rolls:</strong> ${rollsDisplay}
+              </div>
+            </div>`;
+          document.getElementById("tamperOverlay").style.display = "flex";
+        }
+      }
+    });
+    auditListeners.push(unsub);
+  });
+}
+
+// We need raw Firestore functions for the snapshot listener
+import {
+  collection as _col,
+  query as _q,
+  where as _wh,
+  onSnapshot as _snap
+} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+window._firestoreCollection = _col;
+window._firestoreQuery = _q;
+window._firestoreWhere = _wh;
+window._firestoreOnSnapshot = _snap;</script>
+</body>
+</html>

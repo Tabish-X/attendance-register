@@ -1,0 +1,10 @@
+{
+  "version": 2,
+  "buildCommand": "node build.js",
+  "outputDirectory": ".",
+  "routes": [
+    { "src": "/", "dest": "/index.html" },
+    { "src": "/teacher", "dest": "/teacher.html" },
+    { "src": "/student", "dest": "/student.html" }
+  ]
+}
