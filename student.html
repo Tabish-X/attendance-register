@@ -436,7 +436,7 @@ function checkDefaulterWarning() {
   const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 
   // Only show from 18th onwards
-  if (day < 18) return;
+  if (day < 20) return;
 
   // Calculate OVERALL monthly attendance across all subjects combined
   let totalPresent = 0, totalClasses = 0;
@@ -456,7 +456,7 @@ function checkDefaulterWarning() {
   // Only warn if overall monthly attendance is below 75%
   if (overallMonthPct >= 75) return;
 
-  // Show once per browser session (every time they open the tab/visit the site)
+  // Show once per browser session (popup)
   const sessionKey = `defaulterShown_${currentMonth}`;
   if (sessionStorage.getItem(sessionKey)) return;
   sessionStorage.setItem(sessionKey, "1");
@@ -465,8 +465,13 @@ function checkDefaulterWarning() {
   document.getElementById("defaulterPctDisplay").textContent = overallMonthPct + "%";
   document.getElementById("defaulterOverlay").style.display = "flex";
 
-  // Browser notification on 18th and 25th exactly
-  if (day === 18 || day === 25) {
+  // Browser notification — once per day after 20th
+  // localStorage tracks the last date a notification was sent
+  const notifKey = `defaulterNotif_${currentUser?.uid || "anon"}_${currentMonth}`;
+  const lastNotifDate = localStorage.getItem(notifKey);
+  const todayStr = now.toISOString().slice(0, 10); // "YYYY-MM-DD"
+  if (lastNotifDate !== todayStr) {
+    localStorage.setItem(notifKey, todayStr);
     sendDefaulterNotification(overallMonthPct);
   }
 }
@@ -476,7 +481,7 @@ function sendDefaulterNotification(pct) {
 
   const send = () => {
     new Notification("Attendance Warning — Attendify", {
-      body: `Your overall attendance this month is ${pct}%. You may be placed on the defaulter list.`,
+      body: `Your overall attendance this month is ${pct}%. You may be placed on the defaulter list. Please attend classes.`,
       icon: "/favicon.ico",
       tag: "defaulter-warning",
     });
