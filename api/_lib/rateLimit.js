@@ -6,12 +6,12 @@ const { sendError } = require('./errors');
  * Extract the client IP address from the request.
  */
 function getClientIp(req) {
-  const forwarded = req.headers['x-forwarded-for'];
+  const forwarded = req && req.headers ? (req.headers['x-forwarded-for'] || req.headers['X-Forwarded-For']) : null;
   if (forwarded) {
     const first = forwarded.split(',')[0].trim();
     if (first) return first;
   }
-  return (req.socket && req.socket.remoteAddress) || '127.0.0.1';
+  return (req && req.socket && req.socket.remoteAddress) || '127.0.0.1';
 }
 
 /**
