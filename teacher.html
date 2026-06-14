@@ -706,6 +706,44 @@ let classes = [];
 let subjects = [];
 let activePage = "classes";
 
+// Optimistically render from cache before Firebase Auth finishes loading (makes page load instant)
+(function() {
+  try {
+    const profile = JSON.parse(localStorage.getItem("userProfile"));
+    if (profile && profile.role === "teacher") {
+      const cachedClasses = JSON.parse(localStorage.getItem(`cachedClasses_${profile.uid}`));
+      const cachedSubjects = JSON.parse(localStorage.getItem(`cachedSubjects_${profile.uid}`));
+      if (cachedClasses && cachedSubjects) {
+        classes = cachedClasses;
+        subjects = cachedSubjects;
+        
+        const runOptimisticRender = () => {
+          const name = profile.name || profile.email || "Teacher";
+          const initials = name.trim().split(" ").map(w => w[0]).join("").toUpperCase().slice(0,2);
+          
+          document.getElementById("profileAvatar").textContent = initials;
+          document.getElementById("profileBtnName").textContent = name;
+          document.getElementById("pdName").textContent = name;
+          document.getElementById("pdEmail").textContent = profile.email || "";
+          
+          renderClasses();
+          renderSubjectsPage();
+          populateSubjectDropdowns();
+          populateClassDropdowns();
+          populateExportDropdowns();
+          document.getElementById("attDate").value = new Date().toISOString().slice(0,10);
+        };
+
+        if (document.readyState === "loading") {
+          document.addEventListener("DOMContentLoaded", runOptimisticRender);
+        } else {
+          runOptimisticRender();
+        }
+      }
+    }
+  } catch(_) {}
+})();
+
 // Attendance marking state
 let attStudents = []; // [{roll, docId}]
 let attRecords = {};  // {roll: "P"|"A"}
@@ -765,7 +803,7 @@ onAuthStateChanged(auth, async (user) => {
         localStorage.removeItem("userProfile");
         logoutUser().then(() => { window.location.href = "/"; });
       } else {
-        localStorage.setItem("userProfile", JSON.stringify(data));
+        localStorage.setItem("userProfile", JSON.stringify({ ...data, uid: user.uid }));
       }
     }).catch(() => {});
     return;
@@ -779,7 +817,7 @@ onAuthStateChanged(auth, async (user) => {
       window.location.href = "/";
       return;
     }
-    localStorage.setItem("userProfile", JSON.stringify(data));
+    localStorage.setItem("userProfile", JSON.stringify({ ...data, uid: user.uid }));
     currentUser = { ...user, profile: { name: data.name, email: data.email, role: data.role } };
     const name = data.name || user.email;
     const initials = name.trim().split(" ").map(w => w[0]).join("").toUpperCase().slice(0,2);

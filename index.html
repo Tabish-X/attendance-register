@@ -4,6 +4,17 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Attendify - Sign In</title>
+<script>
+  (function() {
+    try {
+      const profile = JSON.parse(localStorage.getItem("userProfile"));
+      if (profile) {
+        if (profile.role === "teacher") { window.location.replace("/teacher"); }
+        else if (profile.role === "student") { window.location.replace("/student"); }
+      }
+    } catch(_) {}
+  })();
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css" />
@@ -155,7 +166,7 @@ onAuthStateChanged(auth, async (user) => {
   if (user && user.emailVerified) {
     try {
       const data = await loginCheck();
-      localStorage.setItem("userProfile", JSON.stringify(data));
+      localStorage.setItem("userProfile", JSON.stringify({ ...data, uid: user.uid }));
       if (data.role === "teacher") { window.location.href = "/teacher"; return; }
       if (data.role === "student") { window.location.href = "/student"; return; }
     } catch(_) {}
@@ -231,7 +242,7 @@ window.handleLogin = async function() {
     }
     // Call backend for role check and pending user migration
     const data = await loginCheck();
-    localStorage.setItem("userProfile", JSON.stringify(data));
+    localStorage.setItem("userProfile", JSON.stringify({ ...data, uid: user.uid }));
     if (data.role !== currentRole) {
       showAlert(`This account is registered as a ${data.role}. Please select "${data.role}" above.`, "error");
       setLoading(false);

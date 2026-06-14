@@ -394,6 +394,36 @@ let myRoll = null;
 let myLinks = [];
 let allSubjectData = [];
 
+// Optimistically render from cache before Firebase Auth finishes loading (makes page load instant)
+(function() {
+  try {
+    const profile = JSON.parse(localStorage.getItem("userProfile"));
+    if (profile && profile.role === "student") {
+      const cachedOverview = JSON.parse(localStorage.getItem(`cachedOverview_${profile.uid}`));
+      if (cachedOverview) {
+        processOverviewData(cachedOverview);
+        
+        const runOptimisticRender = () => {
+          document.getElementById("userLabel").textContent = profile.name || profile.email || "Student";
+          document.getElementById("profileName").textContent = profile.name || "-";
+          document.getElementById("profileEmail").textContent = profile.email || "";
+          
+          renderOverview();
+          renderSubjectWise();
+          renderAccountPage();
+          checkDefaulterWarning();
+        };
+
+        if (document.readyState === "loading") {
+          document.addEventListener("DOMContentLoaded", runOptimisticRender);
+        } else {
+          runOptimisticRender();
+        }
+      }
+    }
+  } catch(_) {}
+})();
+
 function setLoading(v) {
   document.getElementById("loadingOverlay").classList.toggle("show", v);
 }
@@ -426,7 +456,7 @@ onAuthStateChanged(auth, async (user) => {
         localStorage.removeItem("userProfile");
         logoutUser().then(() => { window.location.href = "/"; });
       } else {
-        localStorage.setItem("userProfile", JSON.stringify(data));
+        localStorage.setItem("userProfile", JSON.stringify({ ...data, uid: user.uid }));
       }
     }).catch(() => {});
     return;
@@ -440,7 +470,7 @@ onAuthStateChanged(auth, async (user) => {
       window.location.href = "/";
       return;
     }
-    localStorage.setItem("userProfile", JSON.stringify(data));
+    localStorage.setItem("userProfile", JSON.stringify({ ...data, uid: user.uid }));
     currentUser = { ...user };
     myProfile = { name: data.name, email: data.email, role: data.role };
     myRoll = null;
