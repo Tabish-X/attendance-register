@@ -24,6 +24,9 @@
     { "src": "/api/students/profile", "dest": "/api/students.js?action=profile" },
     { "src": "/api/reports/session", "dest": "/api/reports.js?action=session" },
     { "src": "/api/reports/class-report", "dest": "/api/reports.js?action=class-report" },
+    { "src": "/index.html", "status": 308, "headers": { "Location": "/" } },
+    { "src": "/teacher.html", "status": 308, "headers": { "Location": "/teacher" } },
+    { "src": "/student.html", "status": 308, "headers": { "Location": "/student" } },
     { "src": "/", "dest": "/index.html" },
     { "src": "/teacher", "dest": "/teacher.html" },
     { "src": "/student", "dest": "/student.html" }

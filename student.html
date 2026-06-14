@@ -400,11 +400,11 @@ function setLoading(v) {
 
 // ===== AUTH GUARD =====
 onAuthStateChanged(auth, async (user) => {
-  if (!user) { window.location.href = "index.html"; return; }
-  if (!user.emailVerified) { window.location.href = "index.html"; return; }
+  if (!user) { window.location.href = "/"; return; }
+  if (!user.emailVerified) { window.location.href = "/"; return; }
   try {
     const data = await loginCheck();
-    if (!data || data.role !== "student") { window.location.href = "index.html"; return; }
+    if (!data || data.role !== "student") { window.location.href = "/"; return; }
     currentUser = { ...user };
     myProfile = { name: data.name, email: data.email, role: data.role };
     myRoll = null; // will be set in loadAllData
@@ -414,7 +414,7 @@ onAuthStateChanged(auth, async (user) => {
     await loadAllData();
   } catch(e) {
     console.error('Auth check failed:', e);
-    window.location.href = "index.html";
+    window.location.href = "/";
   }
 });
 async function loadAllData() {
@@ -563,7 +563,7 @@ window.showPage = function(page) {
 
 window.handleLogout = async function() {
   await logoutUser();
-  window.location.href = "index.html";
+  window.location.href = "/";
 };
 
 window.openModal = function(id) { document.getElementById(id).classList.add("open"); };
