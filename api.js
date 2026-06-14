@@ -29,7 +29,7 @@ async function apiCall(method, path, body = null) {
     throw new Error(`Server returned non-JSON response: ${text.slice(0, 150)}... (Status ${res.status})`);
   }
   if (!res.ok) {
-    throw new Error(data.error || `Request failed (${res.status})`);
+    throw new Error(data.error || `Request failed (${res.status}) on ${method} ${path}`);
   }
   return data;
 }
@@ -50,7 +50,7 @@ export async function signupUser(email, password, name, role, teacherCode = null
   } catch (err) {
     throw new Error(`Server returned non-JSON response: ${text.slice(0, 150)}... (Status ${res.status})`);
   }
-  if (!res.ok) throw new Error(data.error || "Signup failed");
+  if (!res.ok) throw new Error(data.error || `Signup failed (${res.status})`);
   return data;
 }
 
