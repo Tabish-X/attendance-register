@@ -289,90 +289,106 @@ async function handleOverview(req, res) {
   const uid = req.user.uid;
 
   try {
-    const userDoc = await adminDb.collection('users').doc(uid).get();
+    const [userDoc, linksSnap] = await Promise.all([
+      adminDb.collection('users').doc(uid).get(),
+      adminDb.collection('studentLinks').where('uid', '==', uid).get(),
+    ]);
+
     const profile = userDoc.exists ? userDoc.data() : {};
     const myRoll = profile.myRoll || null;
+    const linksData = linksSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
-    const linksSnap = await adminDb.collection('studentLinks')
-      .where('uid', '==', uid).get();
+    // Phase 2: Fetch classes, divisions, and subjects in parallel for all links
+    const linkDetails = await Promise.all(
+      linksData.map(async (link) => {
+        const { classId, divisionId } = link;
+        const [classDoc, divDoc, subsSnap] = await Promise.all([
+          adminDb.collection('classes').doc(classId).get(),
+          adminDb.collection('classes').doc(classId).collection('divisions').doc(divisionId).get(),
+          adminDb.collection('subjects').where('classId', '==', classId).where('divisionId', '==', divisionId).get(),
+        ]);
 
-    const links = [];
-    const subjects = [];
+        const className = classDoc.exists ? classDoc.data().name || '' : '';
+        const divisionName = divDoc.exists ? divDoc.data().name || '' : '';
 
-    for (const linkDoc of linksSnap.docs) {
-      const linkData = linkDoc.data();
-      const { classId, divisionId } = linkData;
-
-      let className = '';
-      try {
-        const classDoc = await adminDb.collection('classes').doc(classId).get();
-        if (classDoc.exists) className = classDoc.data().name || '';
-      } catch (_) {}
-
-      let divisionName = '';
-      try {
-        const divDoc = await adminDb.collection('classes').doc(classId)
-          .collection('divisions').doc(divisionId).get();
-        if (divDoc.exists) divisionName = divDoc.data().name || '';
-      } catch (_) {}
-
-      links.push({
-        id: linkDoc.id,
-        classId,
-        divisionId,
-        roll: linkData.roll,
-        className,
-        divisionName,
-      });
-
-      const subsSnap = await adminDb.collection('subjects')
-        .where('classId', '==', classId)
-        .where('divisionId', '==', divisionId).get();
-
-      for (const subDoc of subsSnap.docs) {
-        const subData = subDoc.data();
-
-        const attSnap = await adminDb.collection('attendance')
-          .where('subjectId', '==', subDoc.id).get();
-
-        const records = [];
-        for (const attDoc of attSnap.docs) {
-          const attData = attDoc.data();
-          const status = attData.records?.[String(myRoll || linkData.roll)];
-          if (status) {
-            records.push({ date: attData.date, status });
-          }
-        }
-        records.sort((a, b) => a.date.localeCompare(b.date));
-
-        const present = records.filter(r => r.status === 'P').length;
-        const total = records.length;
-        const pct = total > 0 ? parseFloat(((present / total) * 100).toFixed(2)) : 0;
-
-        const monthly = {};
-        for (const r of records) {
-          const month = r.date.slice(0, 7);
-          if (!monthly[month]) monthly[month] = { present: 0, total: 0 };
-          monthly[month].total++;
-          if (r.status === 'P') monthly[month].present++;
-        }
-        for (const [k, v] of Object.entries(monthly)) {
-          v.pct = parseFloat(((v.present / v.total) * 100).toFixed(2));
-        }
-
-        subjects.push({
-          id: subDoc.id,
-          name: subData.name,
+        return {
+          link,
           className,
           divisionName,
-          classId,
-          divisionId,
-          overall: { present, total, pct },
-          monthly,
-          records,
+          subjects: subsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })),
+        };
+      })
+    );
+
+    // Phase 3: Flatten subjects and fetch all attendance sessions in parallel
+    const allSubjects = [];
+    linkDetails.forEach((detail) => {
+      detail.subjects.forEach((sub) => {
+        allSubjects.push({
+          sub,
+          roll: myRoll || detail.link.roll,
+          className: detail.className,
+          divisionName: detail.divisionName,
         });
+      });
+    });
+
+    const attendanceSnaps = await Promise.all(
+      allSubjects.map((item) =>
+        adminDb.collection('attendance').where('subjectId', '==', item.sub.id).get()
+      )
+    );
+
+    const subjects = allSubjects.map((item, idx) => {
+      const { sub, roll, className, divisionName } = item;
+      const attSnap = attendanceSnaps[idx];
+
+      const records = [];
+      for (const attDoc of attSnap.docs) {
+        const attData = attDoc.data();
+        const status = attData.records?.[String(roll)];
+        if (status) {
+          records.push({ date: attData.date, status });
+        }
       }
-    }
+      records.sort((a, b) => a.date.localeCompare(b.date));
+
+      const present = records.filter(r => r.status === 'P').length;
+      const total = records.length;
+      const pct = total > 0 ? parseFloat(((present / total) * 100).toFixed(2)) : 0;
+
+      const monthly = {};
+      for (const r of records) {
+        const month = r.date.slice(0, 7);
+        if (!monthly[month]) monthly[month] = { present: 0, total: 0 };
+        monthly[month].total++;
+        if (r.status === 'P') monthly[month].present++;
+      }
+      for (const [k, v] of Object.entries(monthly)) {
+        v.pct = parseFloat(((v.present / v.total) * 100).toFixed(2));
+      }
+
+      return {
+        id: sub.id,
+        name: sub.name,
+        className,
+        divisionName,
+        classId: sub.classId,
+        divisionId: sub.divisionId,
+        overall: { present, total, pct },
+        monthly,
+        records,
+      };
+    });
+
+    const links = linkDetails.map((detail) => ({
+      id: detail.link.id,
+      classId: detail.link.classId,
+      divisionId: detail.link.divisionId,
+      roll: detail.link.roll,
+      className: detail.className,
+      divisionName: detail.divisionName,
+    }));
 
     return sendSuccess(res, {
       profile: {

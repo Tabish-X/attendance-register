@@ -86,18 +86,30 @@ async function handleStudents(req, res) {
       .collection('divisions').doc(divisionId)
       .collection('students').get();
 
-    const students = [];
-    for (const doc of snap.docs) {
-      const data = doc.data();
-      let name = null;
-      if (data.uid) {
-        try {
-          const userDoc = await adminDb.collection('users').doc(data.uid).get();
-          if (userDoc.exists) name = userDoc.data().name || null;
-        } catch (_) {}
+    const docDataList = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+    const userDocsMap = {};
+    const uidsToFetch = [...new Set(docDataList.map(d => d.uid).filter(Boolean))];
+
+    if (uidsToFetch.length > 0) {
+      try {
+        const userSnaps = await Promise.all(
+          uidsToFetch.map(uid => adminDb.collection('users').doc(uid).get())
+        );
+        userSnaps.forEach(userDoc => {
+          if (userDoc.exists) {
+            userDocsMap[userDoc.id] = userDoc.data().name || null;
+          }
+        });
+      } catch (err) {
+        console.error('Failed to fetch user profiles in parallel:', err);
       }
-      students.push({ id: doc.id, roll: data.roll, uid: data.uid || null, name });
     }
+
+    const students = docDataList.map(data => {
+      const name = data.uid ? (userDocsMap[data.uid] || null) : null;
+      return { id: data.id, roll: data.roll, uid: data.uid || null, name };
+    });
 
     students.sort((a, b) => parseInt(a.roll) - parseInt(b.roll));
     return sendSuccess(res, { students });

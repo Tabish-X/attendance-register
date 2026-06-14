@@ -66,7 +66,6 @@ async function handleSessionReport(req, res) {
 // ==========================================
 async function handleClassReport(req, res) {
   if (req.method !== 'GET') return sendError(res, 405, 'Method not allowed');
-
   const { classId } = req.query;
   if (!classId) return sendError(res, 400, 'classId is required');
 
@@ -81,45 +80,56 @@ async function handleClassReport(req, res) {
     const divsSnap = await adminDb.collection('classes').doc(classId)
       .collection('divisions').get();
 
-    const divisions = [];
-
-    for (const divDoc of divsSnap.docs) {
+    // Fetch details for all divisions in parallel
+    const divisions = await Promise.all(divsSnap.docs.map(async (divDoc) => {
       const divData = divDoc.data();
 
-      const subsSnap = await adminDb.collection('subjects')
-        .where('classId', '==', classId)
-        .where('divisionId', '==', divDoc.id).get();
+      // Step 1: Fetch subjects and students for this division in parallel
+      const [subsSnap, studentsSnap] = await Promise.all([
+        adminDb.collection('subjects')
+          .where('classId', '==', classId)
+          .where('divisionId', '==', divDoc.id).get(),
+        adminDb.collection('classes').doc(classId)
+          .collection('divisions').doc(divDoc.id)
+          .collection('students').get(),
+      ]);
 
       const subjects = subsSnap.docs.map(s => ({ id: s.id, name: s.data().name }));
+      const studentsDataList = studentsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
-      const studentsSnap = await adminDb.collection('classes').doc(classId)
-        .collection('divisions').doc(divDoc.id)
-        .collection('students').get();
+      // Step 2: Fetch student profiles and subject attendance sessions in parallel
+      const uidsToFetch = [...new Set(studentsDataList.map(s => s.uid).filter(Boolean))];
+      
+      const [userSnaps, attendanceSnapsList] = await Promise.all([
+        Promise.all(uidsToFetch.map(uid => adminDb.collection('users').doc(uid).get())),
+        Promise.all(subjects.map(sub => adminDb.collection('attendance').where('subjectId', '==', sub.id).get())),
+      ]);
 
-      const students = [];
-      for (const sDoc of studentsSnap.docs) {
-        const sData = sDoc.data();
-        let name = null;
-        if (sData.uid) {
-          try {
-            const userDoc = await adminDb.collection('users').doc(sData.uid).get();
-            if (userDoc.exists) name = userDoc.data().name || null;
-          } catch (_) {}
+      // Map user profiles
+      const userDocsMap = {};
+      userSnaps.forEach(userDoc => {
+        if (userDoc.exists) {
+          userDocsMap[userDoc.id] = userDoc.data().name || null;
         }
-        students.push({ roll: sData.roll, name, uid: sData.uid || null });
-      }
+      });
+
+      const students = studentsDataList.map(sData => {
+        const name = sData.uid ? (userDocsMap[sData.uid] || null) : null;
+        return { roll: sData.roll, name, uid: sData.uid || null };
+      });
       students.sort((a, b) => parseInt(a.roll) - parseInt(b.roll));
 
+      // Map attendance sessions
       const sessions = {};
-      for (const sub of subjects) {
-        const attSnap = await adminDb.collection('attendance')
-          .where('subjectId', '==', sub.id).get();
+      subjects.forEach((sub, idx) => {
+        const attSnap = attendanceSnapsList[idx];
         sessions[sub.id] = attSnap.docs.map(a => ({
           date: a.data().date,
           records: a.data().records || {},
         }));
-      }
+      });
 
+      // Compute percentages
       const percentages = {};
       for (const student of students) {
         percentages[student.roll] = {};
@@ -140,15 +150,15 @@ async function handleClassReport(req, res) {
         }
       }
 
-      divisions.push({
+      return {
         id: divDoc.id,
         name: divData.name,
         subjects,
         students,
         sessions,
         percentages,
-      });
-    }
+      };
+    }));
 
     return sendSuccess(res, { className, divisions });
   } catch (err) {
