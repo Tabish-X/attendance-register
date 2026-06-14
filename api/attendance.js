@@ -19,13 +19,19 @@ async function handleTamperCheck(req, res) {
       .where('teacherUid', '==', req.user.uid).get();
 
     const tampered = [];
+    const subjectDocs = subjectsSnap.docs;
 
-    for (const subDoc of subjectsSnap.docs) {
+    const attendanceSnapsList = await Promise.all(
+      subjectDocs.map(subDoc =>
+        adminDb.collection('attendance').where('subjectId', '==', subDoc.id).get()
+      )
+    );
+
+    for (let i = 0; i < subjectDocs.length; i++) {
+      const subDoc = subjectDocs[i];
       const subjectId = subDoc.id;
       const subjectName = subDoc.data().name || 'Unknown';
-
-      const attendanceSnap = await adminDb.collection('attendance')
-        .where('subjectId', '==', subjectId).get();
+      const attendanceSnap = attendanceSnapsList[i];
 
       for (const attDoc of attendanceSnap.docs) {
         const data = attDoc.data();

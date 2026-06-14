@@ -214,11 +214,19 @@ async function runTamperCheck(teacherUid) {
     .where('teacherUid', '==', teacherUid).get();
 
   const tampered = [];
+  const subjectDocs = subjectsSnap.docs;
 
-  for (const subDoc of subjectsSnap.docs) {
+  // Fetch all attendance snaps in parallel
+  const attendanceSnapsList = await Promise.all(
+    subjectDocs.map(subDoc =>
+      adminDb.collection('attendance').where('subjectId', '==', subDoc.id).get()
+    )
+  );
+
+  for (let i = 0; i < subjectDocs.length; i++) {
+    const subDoc = subjectDocs[i];
     const subjectId = subDoc.id;
-    const attendanceSnap = await adminDb.collection('attendance')
-      .where('subjectId', '==', subjectId).get();
+    const attendanceSnap = attendanceSnapsList[i];
 
     for (const attDoc of attendanceSnap.docs) {
       const data = attDoc.data();
