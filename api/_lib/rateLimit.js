@@ -74,6 +74,11 @@ async function checkRateLimit(req, max, windowSeconds) {
  */
 function withRateLimit(handler, { max = 30, window: windowSeconds = 60 } = {}) {
   return async function rateLimitWrapper(req, res) {
+    // Bypass rate limiting for GET requests to avoid database overhead on read operations
+    if (req.method === 'GET') {
+      return handler(req, res);
+    }
+
     const result = await checkRateLimit(req, max, windowSeconds);
 
     res.setHeader('X-RateLimit-Limit', max);
