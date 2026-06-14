@@ -3,7 +3,7 @@
   "version": "2.0.0",
   "private": true,
   "scripts": {
-    "build": "npm install --production && node build.js"
+    "build": "node build.js"
   },
   "dependencies": {
     "firebase-admin": "^13.0.0"

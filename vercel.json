@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "buildCommand": "npm install --production && node build.js",
+  "buildCommand": "node build.js",
   "outputDirectory": ".",
   "routes": [
     { "src": "/", "dest": "/index.html" },
