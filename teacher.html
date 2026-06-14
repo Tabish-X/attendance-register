@@ -799,6 +799,44 @@ onAuthStateChanged(auth, async (user) => {
 });
 
 async function loadAllData() {
+  // Try to load from cache first for instant rendering
+  let cachedClasses = null;
+  let cachedSubjects = null;
+  try {
+    cachedClasses = JSON.parse(localStorage.getItem(`cachedClasses_${currentUser.uid}`));
+    cachedSubjects = JSON.parse(localStorage.getItem(`cachedSubjects_${currentUser.uid}`));
+  } catch(_) {}
+
+  if (cachedClasses && cachedSubjects) {
+    classes = cachedClasses;
+    subjects = cachedSubjects;
+    renderClasses();
+    renderSubjectsPage();
+    populateSubjectDropdowns();
+    populateClassDropdowns();
+    populateExportDropdowns();
+    document.getElementById("attDate").value = new Date().toISOString().slice(0,10);
+    
+    // Background fresh fetch
+    Promise.all([getTeacherClasses(), getTeacherSubjects()]).then(([cData, sData]) => {
+      classes = cData;
+      subjects = sData;
+      localStorage.setItem(`cachedClasses_${currentUser.uid}`, JSON.stringify(classes));
+      localStorage.setItem(`cachedSubjects_${currentUser.uid}`, JSON.stringify(subjects));
+      
+      // Silent re-render
+      renderClasses();
+      renderSubjectsPage();
+      populateSubjectDropdowns();
+      populateClassDropdowns();
+      populateExportDropdowns();
+    }).catch(e => console.error("Background refresh failed:", e));
+
+    startPeriodicTamperCheck();
+    return;
+  }
+
+  // Fallback: No cache, show active loader
   setLoading(true);
   try {
     const [cData, sData] = await Promise.all([
@@ -807,6 +845,8 @@ async function loadAllData() {
     ]);
     classes = cData;
     subjects = sData;
+    localStorage.setItem(`cachedClasses_${currentUser.uid}`, JSON.stringify(classes));
+    localStorage.setItem(`cachedSubjects_${currentUser.uid}`, JSON.stringify(subjects));
 
     renderClasses();
     renderSubjectsPage();
@@ -838,6 +878,10 @@ window.showPage = function(page) {
 // ===== LOGOUT =====
 window.handleLogout = async function() {
   localStorage.removeItem("userProfile");
+  if (currentUser) {
+    localStorage.removeItem(`cachedClasses_${currentUser.uid}`);
+    localStorage.removeItem(`cachedSubjects_${currentUser.uid}`);
+  }
   await logoutUser();
   window.location.href = "/";
 };
@@ -1846,14 +1890,17 @@ function showTamperOverlay(tampered) {
   document.getElementById("tamperOverlay").style.display = "flex";
 }
 
+async function runImmediateTamperCheck() {
+  try {
+    const tampered = await checkTamperOnLogin();
+    if (tampered.length > 0) showTamperOverlay(tampered);
+  } catch(_) {}
+}
+
 function startPeriodicTamperCheck() {
+  runImmediateTamperCheck();
   if (tamperInterval) clearInterval(tamperInterval);
-  tamperInterval = setInterval(async () => {
-    try {
-      const tampered = await checkTamperOnLogin();
-      if (tampered.length > 0) showTamperOverlay(tampered);
-    } catch(_) {}
-  }, 60000);
+  tamperInterval = setInterval(runImmediateTamperCheck, 60000);
 }
 </script>
 </body>

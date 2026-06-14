@@ -34,22 +34,33 @@ async function handleSessionReport(req, res) {
     .collection('divisions').doc(subData.divisionId)
     .collection('students').get();
 
-  const students = [];
-  for (const sDoc of studentsSnap.docs) {
-    const sData = sDoc.data();
-    let name = null;
-    if (sData.uid) {
-      try {
-        const userDoc = await adminDb.collection('users').doc(sData.uid).get();
-        if (userDoc.exists) name = userDoc.data().name || null;
-      } catch (_) {}
+  const docDataList = studentsSnap.docs.map(doc => doc.data());
+  const userDocsMap = {};
+  const uidsToFetch = [...new Set(docDataList.map(d => d.uid).filter(Boolean))];
+
+  if (uidsToFetch.length > 0) {
+    try {
+      const userSnaps = await Promise.all(
+        uidsToFetch.map(uid => adminDb.collection('users').doc(uid).get())
+      );
+      userSnaps.forEach(userDoc => {
+        if (userDoc.exists) {
+          userDocsMap[userDoc.id] = userDoc.data().name || null;
+        }
+      });
+    } catch (err) {
+      console.error('Failed to fetch user profiles in parallel for session report:', err);
     }
-    students.push({
+  }
+
+  const students = docDataList.map(sData => {
+    const name = sData.uid ? (userDocsMap[sData.uid] || null) : null;
+    return {
       roll: sData.roll,
       name,
       status: attData.records?.[sData.roll] || null,
-    });
-  }
+    };
+  });
 
   students.sort((a, b) => parseInt(a.roll) - parseInt(b.roll));
 

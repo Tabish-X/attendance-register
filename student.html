@@ -454,40 +454,76 @@ onAuthStateChanged(auth, async (user) => {
     window.location.href = "/";
   }
 });
-async function loadAllData() {
+function processOverviewData(overview) {
+  myRoll = overview.profile?.myRoll || null;
+  myProfile = overview.profile || myProfile;
+  myLinks = overview.links || [];
+
+  // Build allSubjectData from overview response
+  allSubjectData = (overview.subjects || []).map(s => {
+    const records = (s.records || []).map(r => ({ date: r.date, status: r.status }));
+    const pct = s.overall || calcAttendancePct(records);
+    const monthlyPcts = {};
+    if (s.monthly) {
+      for (const [month, data] of Object.entries(s.monthly)) {
+        monthlyPcts[month] = data;
+      }
+    } else {
+      const grouped = groupByMonth(records);
+      for (const [month, recs] of Object.entries(grouped)) {
+        monthlyPcts[month] = calcAttendancePct(recs);
+      }
+    }
+    return {
+      subject: { id: s.id, name: s.name, classId: s.classId, divisionId: s.divisionId },
+      roll: myRoll,
+      classId: s.classId,
+      divisionId: s.divisionId,
+      records,
+      pct,
+      monthlyPcts,
+    };
+  });
+}
+
+async function loadAllData(forceFresh = false) {
+  // Try to load from cache first for instant rendering
+  let cachedOverview = null;
+  if (!forceFresh) {
+    try {
+      cachedOverview = JSON.parse(localStorage.getItem(`cachedOverview_${currentUser.uid}`));
+    } catch(_) {}
+  }
+
+  if (cachedOverview) {
+    processOverviewData(cachedOverview);
+    renderOverview();
+    renderSubjectWise();
+    renderAccountPage();
+    checkDefaulterWarning();
+
+    // Background fresh fetch
+    getStudentOverview().then(overview => {
+      localStorage.setItem(`cachedOverview_${currentUser.uid}`, JSON.stringify(overview));
+      processOverviewData(overview);
+      
+      // Silent re-render
+      renderOverview();
+      renderSubjectWise();
+      renderAccountPage();
+      checkDefaulterWarning();
+    }).catch(e => console.error("Background overview refresh failed:", e));
+
+    return;
+  }
+
+  // Fallback: No cache, show active loader
   setLoading(true);
   try {
     try {
       const overview = await getStudentOverview();
-      myRoll = overview.profile?.myRoll || null;
-      myProfile = overview.profile || myProfile;
-      myLinks = overview.links || [];
-
-      // Build allSubjectData from overview response
-      allSubjectData = (overview.subjects || []).map(s => {
-        const records = (s.records || []).map(r => ({ date: r.date, status: r.status }));
-        const pct = s.overall || calcAttendancePct(records);
-        const monthlyPcts = {};
-        if (s.monthly) {
-          for (const [month, data] of Object.entries(s.monthly)) {
-            monthlyPcts[month] = data;
-          }
-        } else {
-          const grouped = groupByMonth(records);
-          for (const [month, recs] of Object.entries(grouped)) {
-            monthlyPcts[month] = calcAttendancePct(recs);
-          }
-        }
-        return {
-          subject: { id: s.id, name: s.name, classId: s.classId, divisionId: s.divisionId },
-          roll: myRoll,
-          classId: s.classId,
-          divisionId: s.divisionId,
-          records,
-          pct,
-          monthlyPcts,
-        };
-      });
+      localStorage.setItem(`cachedOverview_${currentUser.uid}`, JSON.stringify(overview));
+      processOverviewData(overview);
     } catch(e) {
       console.error('Failed to load overview, trying fallback:', e);
       myLinks = await findStudentLinks();
@@ -605,6 +641,9 @@ window.showPage = function(page) {
 
 window.handleLogout = async function() {
   localStorage.removeItem("userProfile");
+  if (currentUser) {
+    localStorage.removeItem(`cachedOverview_${currentUser.uid}`);
+  }
   await logoutUser();
   window.location.href = "/";
 };
@@ -619,9 +658,9 @@ window.handleSetRoll = async function() {
   if (!confirm("Set roll number to " + roll + "? This cannot be changed later.")) return;
   setLoading(true);
   try {
-    await setStudentRoll(currentUser.uid, roll);
+    await setStudentRoll(roll);
     myRoll = roll;
-    await loadAllData();
+    await loadAllData(true);
   } catch(e) {
     setLoading(false);
     alert(e.message || "Error setting roll number.");
@@ -659,12 +698,12 @@ window.handleJoinDivision = async function() {
   setLoading(true);
   try {
     if (!myRoll) {
-      await setStudentRoll(currentUser.uid, roll);
+      await setStudentRoll(roll);
       myRoll = roll;
     }
-    await joinDivisionByCode(currentUser.uid, code, myRoll);
+    await joinDivisionByCode(code);
     closeModal("modalJoin");
-    await loadAllData();
+    await loadAllData(true);
   } catch(e) {
     setLoading(false);
     alert(e.message || "Error joining division. Please check the join code.");
@@ -674,8 +713,13 @@ window.handleJoinDivision = async function() {
 window.handleRemoveLink = async function(linkId) {
   if (!confirm("Leave this division? You can rejoin later with the join code.")) return;
   setLoading(true);
-  await removeStudentLink(linkId);
-  await loadAllData();
+  try {
+    await removeStudentLink(linkId);
+    await loadAllData(true);
+  } catch(e) {
+    setLoading(false);
+    alert(e.message || "Error leaving division.");
+  }
 };
 
 // ===== ACCOUNT PAGE =====

@@ -6,7 +6,6 @@ const { withRateLimit } = require('./_lib/rateLimit');
 const { withAuth } = require('./_lib/auth');
 const { sanitizeString, validateEmail, requireFields } = require('./_lib/validate');
 const { logAudit } = require('./_lib/audit');
-const { verifyChecksum } = require('./_lib/checksum');
 
 // ==========================================
 // SIGNUP LOGIC
@@ -188,103 +187,16 @@ async function handleLoginCheck(req, res) {
 
     const profile = userSnap.data();
 
-    let tampered = [];
-    if (profile.role === 'teacher') {
-      try {
-        tampered = await runTamperCheck(uid);
-      } catch (err) {
-        console.error('[login-check] Tamper check error:', err.message);
-      }
-    }
-
     return sendSuccess(res, {
       role: profile.role,
       name: profile.name || '',
       email: profile.email || req.user.email,
-      tampered,
+      tampered: [],
     });
   } catch (err) {
     console.error('[login-check] Error:', err);
     return sendError(res, 500, 'Internal server error');
   }
-}
-
-async function runTamperCheck(teacherUid) {
-  const subjectsSnap = await adminDb.collection('subjects')
-    .where('teacherUid', '==', teacherUid).get();
-
-  const tampered = [];
-  const subjectDocs = subjectsSnap.docs;
-
-  // Fetch all attendance snaps in parallel
-  const attendanceSnapsList = await Promise.all(
-    subjectDocs.map(subDoc =>
-      adminDb.collection('attendance').where('subjectId', '==', subDoc.id).get()
-    )
-  );
-
-  for (let i = 0; i < subjectDocs.length; i++) {
-    const subDoc = subjectDocs[i];
-    const subjectId = subDoc.id;
-    const attendanceSnap = attendanceSnapsList[i];
-
-    for (const attDoc of attendanceSnap.docs) {
-      const data = attDoc.data();
-      if (!data.checksum) continue;
-
-      const records = data.records || {};
-      const storedChecksum = data.checksum;
-      const isHmac = /^[a-f0-9]{64}$/i.test(storedChecksum);
-
-      let isTampered = false;
-      let changedRolls = [];
-
-      if (isHmac) {
-        isTampered = !verifyChecksum(subjectId, data.date, records, storedChecksum);
-        if (isTampered) changedRolls = ['Unknown (HMAC mismatch)'];
-      } else {
-        const expected = Object.entries(records)
-          .sort(([a], [b]) => a.localeCompare(b))
-          .map(([roll, status]) => `${roll}:${status}`)
-          .join('|');
-
-        if (storedChecksum !== expected) {
-          isTampered = true;
-          try {
-            const storedPairs = {};
-            storedChecksum.split('|').forEach(pair => {
-              const [r, s] = pair.split(':');
-              if (r) storedPairs[r] = s;
-            });
-            const changed = Object.entries(records)
-              .filter(([roll, status]) => storedPairs[roll] !== status)
-              .map(([roll]) => roll);
-            const deletedRolls = Object.keys(storedPairs)
-              .filter(r => !records[r]);
-            changedRolls = [...new Set([...changed, ...deletedRolls])]
-              .sort((a, b) => parseInt(a) - parseInt(b));
-          } catch (_) {
-            changedRolls = ['Unknown'];
-          }
-        }
-      }
-
-      if (isTampered) {
-        tampered.push({
-          subjectId,
-          subjectName: subDoc.data().name || 'Unknown',
-          date: data.date,
-          changedRolls: changedRolls.join(', ') || 'Unknown',
-        });
-
-        logAudit({ user: { uid: teacherUid, email: '', role: 'teacher' } },
-          'TAMPER_DETECTED', `attendance/${attDoc.id}`,
-          { subjectId, date: data.date, changedRolls });
-      }
-    }
-  }
-
-  return tampered;
 }
 
 // Wrap sub-handlers with their specific middlewares & rate limits
