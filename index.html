@@ -155,6 +155,7 @@ onAuthStateChanged(auth, async (user) => {
   if (user && user.emailVerified) {
     try {
       const data = await loginCheck();
+      localStorage.setItem("userProfile", JSON.stringify(data));
       if (data.role === "teacher") { window.location.href = "/teacher"; return; }
       if (data.role === "student") { window.location.href = "/student"; return; }
     } catch(_) {}
@@ -230,6 +231,7 @@ window.handleLogin = async function() {
     }
     // Call backend for role check and pending user migration
     const data = await loginCheck();
+    localStorage.setItem("userProfile", JSON.stringify(data));
     if (data.role !== currentRole) {
       showAlert(`This account is registered as a ${data.role}. Please select "${data.role}" above.`, "error");
       setLoading(false);

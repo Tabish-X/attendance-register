@@ -740,6 +740,38 @@ document.addEventListener("click", function(e) {
 onAuthStateChanged(auth, async (user) => {
   if (!user) { window.location.href = "/"; return; }
   if (!user.emailVerified) { window.location.href = "/"; return; }
+
+  // Optimistic rendering from cache
+  let profile = null;
+  try {
+    profile = JSON.parse(localStorage.getItem("userProfile"));
+  } catch(_) {}
+
+  if (profile && profile.role === "teacher") {
+    currentUser = { ...user, profile };
+    const name = profile.name || user.email;
+    const initials = name.trim().split(" ").map(w => w[0]).join("").toUpperCase().slice(0,2);
+    document.getElementById("profileAvatar").textContent = initials;
+    document.getElementById("profileBtnName").textContent = profile.name || "Teacher";
+    document.getElementById("pdName").textContent = profile.name || "Teacher";
+    document.getElementById("pdEmail").textContent = user.email;
+    
+    // Load dashboard data immediately in parallel
+    loadAllData();
+
+    // Verify token & role in the background
+    loginCheck().then(data => {
+      if (!data || data.role !== "teacher") {
+        localStorage.removeItem("userProfile");
+        logoutUser().then(() => { window.location.href = "/"; });
+      } else {
+        localStorage.setItem("userProfile", JSON.stringify(data));
+      }
+    }).catch(() => {});
+    return;
+  }
+
+  // Fallback: fetch sequentially if no cache exists
   try {
     const data = await loginCheck();
     if (!data || data.role !== "teacher") {
@@ -747,6 +779,7 @@ onAuthStateChanged(auth, async (user) => {
       window.location.href = "/";
       return;
     }
+    localStorage.setItem("userProfile", JSON.stringify(data));
     currentUser = { ...user, profile: { name: data.name, email: data.email, role: data.role } };
     const name = data.name || user.email;
     const initials = name.trim().split(" ").map(w => w[0]).join("").toUpperCase().slice(0,2);
@@ -768,8 +801,13 @@ onAuthStateChanged(auth, async (user) => {
 async function loadAllData() {
   setLoading(true);
   try {
-    classes = await getTeacherClasses();
-    subjects = await getTeacherSubjects();
+    const [cData, sData] = await Promise.all([
+      getTeacherClasses(),
+      getTeacherSubjects()
+    ]);
+    classes = cData;
+    subjects = sData;
+
     renderClasses();
     renderSubjectsPage();
     populateSubjectDropdowns();
@@ -799,6 +837,7 @@ window.showPage = function(page) {
 
 // ===== LOGOUT =====
 window.handleLogout = async function() {
+  localStorage.removeItem("userProfile");
   await logoutUser();
   window.location.href = "/";
 };
