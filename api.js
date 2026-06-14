@@ -21,7 +21,13 @@ async function apiCall(method, path, body = null) {
     opts.body = JSON.stringify(body);
   }
   const res = await fetch(`/api/${path}`, opts);
-  const data = await res.json();
+  let data = {};
+  const text = await res.text();
+  try {
+    data = text ? JSON.parse(text) : {};
+  } catch (err) {
+    throw new Error(`Server returned non-JSON response: ${text.slice(0, 150)}... (Status ${res.status})`);
+  }
   if (!res.ok) {
     throw new Error(data.error || `Request failed (${res.status})`);
   }
@@ -37,7 +43,13 @@ export async function signupUser(email, password, name, role, teacherCode = null
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ email, password, name, role, teacherCode }),
   });
-  const data = await res.json();
+  let data = {};
+  const text = await res.text();
+  try {
+    data = text ? JSON.parse(text) : {};
+  } catch (err) {
+    throw new Error(`Server returned non-JSON response: ${text.slice(0, 150)}... (Status ${res.status})`);
+  }
   if (!res.ok) throw new Error(data.error || "Signup failed");
   return data;
 }
