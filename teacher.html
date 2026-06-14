@@ -742,7 +742,11 @@ onAuthStateChanged(auth, async (user) => {
   if (!user.emailVerified) { window.location.href = "/"; return; }
   try {
     const data = await loginCheck();
-    if (!data || data.role !== "teacher") { window.location.href = "/"; return; }
+    if (!data || data.role !== "teacher") {
+      await logoutUser();
+      window.location.href = "/";
+      return;
+    }
     currentUser = { ...user, profile: { name: data.name, email: data.email, role: data.role } };
     const name = data.name || user.email;
     const initials = name.trim().split(" ").map(w => w[0]).join("").toUpperCase().slice(0,2);
@@ -756,6 +760,7 @@ onAuthStateChanged(auth, async (user) => {
     await loadAllData();
   } catch(e) {
     console.error('Auth check failed:', e);
+    await logoutUser();
     window.location.href = "/";
   }
 });

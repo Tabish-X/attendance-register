@@ -404,7 +404,11 @@ onAuthStateChanged(auth, async (user) => {
   if (!user.emailVerified) { window.location.href = "/"; return; }
   try {
     const data = await loginCheck();
-    if (!data || data.role !== "student") { window.location.href = "/"; return; }
+    if (!data || data.role !== "student") {
+      await logoutUser();
+      window.location.href = "/";
+      return;
+    }
     currentUser = { ...user };
     myProfile = { name: data.name, email: data.email, role: data.role };
     myRoll = null; // will be set in loadAllData
@@ -414,6 +418,7 @@ onAuthStateChanged(auth, async (user) => {
     await loadAllData();
   } catch(e) {
     console.error('Auth check failed:', e);
+    await logoutUser();
     window.location.href = "/";
   }
 });

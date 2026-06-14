@@ -281,7 +281,7 @@ async function runTamperCheck(teacherUid) {
 
 // Wrap sub-handlers with their specific middlewares & rate limits
 const signupHandler = withRateLimit(handleSignup, { max: 5, window: 900 });
-const loginCheckHandler = withRateLimit(withAuth(handleLoginCheck), { max: 20, window: 900 });
+const loginCheckHandler = withRateLimit(withAuth(handleLoginCheck), { max: 100, window: 60 });
 
 // Combined serverless handler
 async function mainHandler(req, res) {
