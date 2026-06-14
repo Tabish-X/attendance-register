@@ -1,6 +1,7 @@
 'use strict';
 
 const admin = require('firebase-admin');
+const { initializeFirestore } = require('firebase-admin/firestore');
 
 let _app = null;
 let _auth = null;
@@ -48,8 +49,10 @@ function getAuth() {
  */
 function getDb() {
   if (_db) return _db;
-  getApp();
-  _db = admin.firestore();
+  const app = getApp();
+  _db = initializeFirestore(app, {
+    preferRest: true
+  });
   return _db;
 }
 
