@@ -1,0 +1,82 @@
+rules_version = '2';
+
+// ============================================================
+// ATTENDIFY — Zero-Trust Firestore Security Rules
+// ============================================================
+// All data mutations go through Vercel serverless API endpoints
+// which use Firebase Admin SDK (bypasses these rules entirely).
+// These rules DENY direct client access to all protected
+// collections. Only minimal read access is granted where
+// absolutely necessary for the client-side Firebase Auth flow.
+// ============================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── INTERNAL COLLECTIONS — No client access ──────────────
+    // Rate limiting data (backend-only)
+    match /_rateLimits/{document=**} {
+      allow read, write: if false;
+    }
+
+    // Audit logs (backend-only, append-only from server)
+    match /_auditLogs/{document=**} {
+      allow read, write: if false;
+    }
+
+    // Pending user profiles (backend manages during signup)
+    match /pendingUsers/{uid} {
+      allow read, write: if false;
+    }
+
+    // ── USER PROFILES — Read own only ────────────────────────
+    // Users can read their own profile (needed for auth guard
+    // redirect check). All writes go through the API.
+    match /users/{uid} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow write: if false;
+    }
+
+    // Teachers collection (backend-only)
+    match /teachers/{uid} {
+      allow read, write: if false;
+    }
+
+    // Students can read their own profile
+    match /students/{uid} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow write: if false;
+    }
+
+    // ── DATA COLLECTIONS — No client access ──────────────────
+    // Classes and all subcollections (divisions, students)
+    match /classes/{document=**} {
+      allow read, write: if false;
+    }
+
+    // Join codes lookup (backend-only)
+    match /joinCodes/{code} {
+      allow read, write: if false;
+    }
+
+    // Student-division links (backend-only)
+    match /studentLinks/{document=**} {
+      allow read, write: if false;
+    }
+
+    // Subjects (backend-only)
+    match /subjects/{document=**} {
+      allow read, write: if false;
+    }
+
+    // Attendance records (backend-only)
+    match /attendance/{document=**} {
+      allow read, write: if false;
+    }
+
+    // ── CATCH-ALL — Deny everything else ─────────────────────
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

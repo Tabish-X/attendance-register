@@ -687,22 +687,18 @@
 <div class="loading-overlay" id="loadingOverlay"><div class="spinner"></div></div>
 
 <script type="module">
+import { auth, logoutUser, onAuthStateChanged } from "./firebase.js";
 import {
-  auth, db,
-  getUserProfile, logoutUser,
-  createClass, getTeacherClasses, deleteClass, updateClassName,
-  addDivision, getDivisions, deleteDivision, regenerateJoinCode,
-  addStudentsToDivision, getDivisionStudents, deleteStudent,
-  createSubject, getTeacherSubjects, deleteSubject, updateSubjectName,
+  getTeacherClasses, createClass, deleteClass, updateClassName,
+  getDivisions, addDivision, deleteDivision, regenerateJoinCode,
+  getDivisionStudents, addStudentsToDivision, deleteStudent,
+  getTeacherSubjects, createSubject, deleteSubject, updateSubjectName,
   saveAttendanceSession, getAttendanceSession, getSubjectAttendance, deleteAttendanceSession,
+  editAttendanceSession, checkTamperOnLogin,
+  getSessionReportData, getClassReportData,
   parseRollRange, formatDate, formatMonthLabel,
-  checkTamperOnLogin,
-  onAuthStateChanged
-} from "./firebase.js";
-
-import {
-  getDoc, doc, updateDoc
-} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+  loginCheck
+} from "./api.js";
 
 // ===== STATE =====
 let currentUser = null;
@@ -744,23 +740,30 @@ document.addEventListener("click", function(e) {
 onAuthStateChanged(auth, async (user) => {
   if (!user) { window.location.href = "index.html"; return; }
   if (!user.emailVerified) { window.location.href = "index.html"; return; }
-  const profile = await getUserProfile(user.uid);
-  if (!profile || profile.role !== "teacher") { window.location.href = "index.html"; return; }
-  currentUser = { ...user, profile };
-  // Fill profile dropdown
-  const name = profile.name || user.email;
-  const initials = name.trim().split(" ").map(w => w[0]).join("").toUpperCase().slice(0,2);
-  document.getElementById("profileAvatar").textContent = initials;
-  document.getElementById("profileBtnName").textContent = profile.name || "Teacher";
-  document.getElementById("pdName").textContent = profile.name || "Teacher";
-  document.getElementById("pdEmail").textContent = user.email;
-  await loadAllData();
+  try {
+    const data = await loginCheck();
+    if (!data || data.role !== "teacher") { window.location.href = "index.html"; return; }
+    currentUser = { ...user, profile: { name: data.name, email: data.email, role: data.role } };
+    const name = data.name || user.email;
+    const initials = name.trim().split(" ").map(w => w[0]).join("").toUpperCase().slice(0,2);
+    document.getElementById("profileAvatar").textContent = initials;
+    document.getElementById("profileBtnName").textContent = data.name || "Teacher";
+    document.getElementById("pdName").textContent = data.name || "Teacher";
+    document.getElementById("pdEmail").textContent = user.email;
+    if (data.tampered && data.tampered.length > 0) {
+      showTamperOverlay(data.tampered);
+    }
+    await loadAllData();
+  } catch(e) {
+    console.error('Auth check failed:', e);
+    window.location.href = "index.html";
+  }
 });
 
 async function loadAllData() {
   setLoading(true);
-  classes = await getTeacherClasses(currentUser.uid);
-  subjects = await getTeacherSubjects(currentUser.uid);
+  classes = await getTeacherClasses();
+  subjects = await getTeacherSubjects();
   renderClasses();
   renderSubjectsPage();
   populateSubjectDropdowns();
@@ -769,70 +772,8 @@ async function loadAllData() {
   document.getElementById("attDate").value = new Date().toISOString().slice(0,10);
   setLoading(false);
 
-  // Check for tampered attendance on login — shows every login until the tamper is fixed
-  if (subjects.length) {
-    const subjectIds = subjects.map(s => s.id);
-    const tampered = await checkTamperOnLogin(subjectIds);
-
-    if (tampered.length > 0) {
-      const rows = await Promise.all(tampered.map(async t => {
-        const subject = subjects.find(s => s.id === t.subjectId);
-        const subjectName = subject?.name || "Unknown Subject";
-        const classId    = subject?.classId;
-        const divisionId = subject?.divisionId;
-        const cls = classes.find(c => c.id === classId);
-        const className = cls?.name || "—";
-        let divisionName = "—";
-        if (classId && divisionId) {
-          try {
-            const divs = await getDivisions(classId);
-            divisionName = divs.find(d => d.id === divisionId)?.name || "—";
-          } catch(_) {}
-        }
-        // Only show rolls that are actually different from checksum
-        let changedRolls = "—";
-        try {
-          const session = await getAttendanceSession(t.subjectId, t.date);
-          if (session?.checksum && session?.records) {
-            // Recompute checksum to find mismatches per roll
-            const storedPairs = session.checksum.split("|").reduce((acc, pair) => {
-              const [r, s] = pair.split(":");
-              if (r) acc[r] = s;
-              return acc;
-            }, {});
-            const changed = Object.entries(session.records)
-              .filter(([roll, status]) => storedPairs[roll] !== status)
-              .map(([roll]) => roll);
-            // Also catch rolls deleted from records but in checksum
-            const deletedRolls = Object.keys(storedPairs)
-              .filter(r => !session.records[r]);
-            const allChanged = [...new Set([...changed, ...deletedRolls])]
-              .sort((a, b) => parseInt(a) - parseInt(b));
-            changedRolls = allChanged.length > 0 ? allChanged.join(", ") : "Unknown";
-          }
-        } catch(_) {}
-        return { subjectName, className, divisionName, date: t.date, changedRolls };
-      }));
-
-      document.getElementById("tamperDetailList").innerHTML = rows.map(r => `
-        <div style="background:var(--danger-light); border:1px solid #fca5a5; border-radius:8px; padding:12px 14px;">
-          <div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:6px;">
-            <span style="background:#fee2e2; color:var(--danger); font-size:0.75rem; font-weight:600; padding:2px 8px; border-radius:100px;">${r.className}</span>
-            <span style="background:#fee2e2; color:var(--danger); font-size:0.75rem; font-weight:600; padding:2px 8px; border-radius:100px;">${r.divisionName}</span>
-            <span style="background:#fee2e2; color:var(--danger); font-size:0.75rem; font-weight:600; padding:2px 8px; border-radius:100px;">${r.subjectName}</span>
-            <span style="background:#fee2e2; color:var(--danger); font-size:0.75rem; font-weight:600; padding:2px 8px; border-radius:100px;">${formatDate(r.date)}</span>
-          </div>
-          <div style="font-size:0.82rem; color:var(--text-2);">
-            <strong>Changed Rolls:</strong> ${r.changedRolls}
-          </div>
-        </div>`).join("");
-
-      document.getElementById("tamperOverlay").style.display = "flex";
-    }
-  }
-
-  // Start real-time listener for changes while logged in
-  startAuditListeners();
+  // Start periodic tamper check (every 60 seconds)
+  startPeriodicTamperCheck();
 }
 
 // ===== PAGE NAVIGATION =====
@@ -885,7 +826,7 @@ window.handleSaveClass = async function() {
   if (editingClassId) {
     await updateClassName(editingClassId, name);
   } else {
-    await createClass(currentUser.uid, name);
+    await createClass(name);
   }
   closeModal("modalAddClass");
   await loadAllData();
@@ -1195,16 +1136,11 @@ async function renderRollTable(attMap) {
 
   const sorted = [...students].sort((a, b) => parseInt(a.roll) - parseInt(b.roll));
 
-  // Fetch names for linked students
+  // Names are already returned from getDivisionStudents API
   const nameMap = {};
-  await Promise.all(sorted.filter(s => s.uid).map(async s => {
-    try {
-      const userSnap = await getDoc(doc(db, "users", s.uid));
-      if (userSnap.exists()) {
-        nameMap[s.uid] = userSnap.data().name || userSnap.data().email || "Unknown";
-      }
-    } catch(_) {}
-  }));
+  sorted.filter(s => s.uid && s.name).forEach(s => {
+    nameMap[s.uid] = s.name;
+  });
 
   wrap.innerHTML = `
     <div class="card">
@@ -1399,7 +1335,7 @@ window.saveAttendance = async function() {
   if (!subjectId || !date) { alert("Please select a subject and date."); return; }
   if (!attStudents.length) { alert("No students found."); return; }
   setLoading(true);
-  markLocalWrite(`${subjectId}_${date}`);
+
   await saveAttendanceSession(subjectId, date, attRecords);
   setLoading(false);
   openModal("modalSaveSuccess");
@@ -1514,7 +1450,7 @@ window.viewSession = async function(subjectId, date) {
 window.deleteHistSession = async function(subjectId, date) {
   if (!confirm("Delete this attendance session?")) return;
   setLoading(true);
-  markLocalWrite(`${subjectId}_${date}`);
+
   await deleteAttendanceSession(subjectId, date);
   await loadHistory();
 };
@@ -1568,7 +1504,7 @@ window.sessionMarkAll = function(status) {
 
 window.saveSessionEdit = async function() {
   setLoading(true);
-  markLocalWrite(`${editSessionSubjectId}_${editSessionDate}`);
+
   await saveAttendanceSession(editSessionSubjectId, editSessionDate, editSessionRecords);
   closeModal("modalSession");
   await loadHistory();
@@ -1578,7 +1514,7 @@ window.saveSessionEdit = async function() {
 window.deleteSession = async function() {
   if (!confirm("Delete this session permanently?")) return;
   setLoading(true);
-  markLocalWrite(`${editSessionSubjectId}_${editSessionDate}`);
+
   await deleteAttendanceSession(editSessionSubjectId, editSessionDate);
   closeModal("modalSession");
   await loadHistory();
@@ -1663,15 +1599,12 @@ window.downloadSessionExcel = async function() {
 
   setLoading(true);
 
-  // Fetch student names
+  // Names are already available from the API response
   const students = attStudents;
   const nameMap = {};
-  await Promise.all(students.filter(s => s.uid).map(async s => {
-    try {
-      const snap = await getDoc(doc(db, "users", s.uid));
-      if (snap.exists()) nameMap[s.uid] = snap.data().name || "";
-    } catch(_) {}
-  }));
+  students.filter(s => s.uid && s.name).forEach(s => {
+    nameMap[s.uid] = s.name;
+  });
 
   const className = getClassName(subject.classId);
   const divName   = await getDivisionName(subject.classId, subject.divisionId);
@@ -1760,14 +1693,11 @@ window.downloadClassReport = async function() {
     const students = await getDivisionStudents(classId, div.id);
     const sorted   = [...students].sort((a, b) => parseInt(a.roll) - parseInt(b.roll));
 
-    // Fetch names
+    // Names are already available from the API response
     const nameMap = {};
-    await Promise.all(sorted.filter(s => s.uid).map(async s => {
-      try {
-        const snap = await getDoc(doc(db, "users", s.uid));
-        if (snap.exists()) nameMap[s.uid] = snap.data().name || "";
-      } catch(_) {}
-    }));
+    sorted.filter(s => s.uid && s.name).forEach(s => {
+      nameMap[s.uid] = s.name;
+    });
 
     // Build data
     const dateHdrs = monthSess.map(s => fmtDate(s.date));
@@ -1843,121 +1773,40 @@ window.dismissTamperAlert = function() {
   sessionStorage.removeItem(`tamperActive_${currentUser.uid}`);
 };
 
-// ===== AUDIT / TAMPER DETECTION =====
-let auditListeners = [];
-let localWriteKeys = new Set();
+// ===== TAMPER DETECTION (PERIODIC POLLING) =====
+let tamperInterval = null;
 
-// Snapshot of records at last known state — used to diff what actually changed
-const knownRecords = {};
-
-window.markLocalWrite = function(key) {
-  localWriteKeys.add(key);
-  setTimeout(() => localWriteKeys.delete(key), 10000);
-};
-
-function startAuditListeners() {
-  subjects.forEach(subject => {
-    const q = window._firestoreQuery(
-      window._firestoreCollection(db, "attendance"),
-      window._firestoreWhere("subjectId", "==", subject.id)
-    );
-
-    const unsub = window._firestoreOnSnapshot(q, async (snapshot) => {
-      for (const change of snapshot.docChanges()) {
-
-        // On first load — just store initial state, never alert
-        if (change.type === "added") {
-          knownRecords[change.doc.id] = { ...(change.doc.data().records || {}) };
-          continue;
-        }
-
-        if (change.type === "modified" || change.type === "removed") {
-          const sessionId = change.doc.id;
-
-          // If THIS browser wrote it — update known state and skip
-          if (localWriteKeys.has(sessionId)) {
-            if (change.type === "modified") {
-              knownRecords[sessionId] = { ...(change.doc.data().records || {}) };
-            } else {
-              delete knownRecords[sessionId];
-            }
-            continue;
-          }
-
-          // Diff to find which specific rolls changed
-          let changedRolls = [];
-          if (change.type === "removed") {
-            changedRolls = Object.keys(knownRecords[sessionId] || {});
-          } else {
-            const newRecords = change.doc.data().records || {};
-            const oldRecords = knownRecords[sessionId] || {};
-            const allRolls = new Set([...Object.keys(newRecords), ...Object.keys(oldRecords)]);
-            for (const roll of allRolls) {
-              if (newRecords[roll] !== oldRecords[roll]) changedRolls.push(roll);
-            }
-            // Update known state
-            knownRecords[sessionId] = { ...newRecords };
-          }
-
-          if (changedRolls.length === 0) continue;
-
-          // Use sessionStorage so same session can't spam
-          // but a new browser session (next visit) will show again if still tampered
-          const activeKey = `tamperActive_${currentUser.uid}`;
-          const active = JSON.parse(sessionStorage.getItem(activeKey) || "[]");
-          // Each unique change event gets its own timestamped key
-          const alertKey = `${sessionId}_${Date.now()}`;
-          // Allow same session to be shown again (don't block by sessionId)
-          active.push(alertKey);
-          sessionStorage.setItem(activeKey, JSON.stringify(active));
-
-          const data = change.doc.data();
-          const cls = classes.find(c => c.id === subject.classId);
-          const className = cls?.name || "—";
-          let divisionName = "—";
-          try {
-            const divs = await getDivisions(subject.classId);
-            divisionName = divs.find(d => d.id === subject.divisionId)?.name || "—";
-          } catch(_) {}
-
-          const rollsDisplay = changedRolls
-            .sort((a, b) => parseInt(a) - parseInt(b))
-            .join(", ");
-
-          const listEl = document.getElementById("tamperDetailList");
-          // Append so multiple consecutive changes all show
-          listEl.innerHTML += `
-            <div style="background:var(--danger-light); border:1px solid #fca5a5; border-radius:8px; padding:12px 14px; margin-bottom:4px;">
-              <div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:6px;">
-                <span style="background:#fee2e2; color:var(--danger); font-size:0.75rem; font-weight:600; padding:2px 8px; border-radius:100px;">${className}</span>
-                <span style="background:#fee2e2; color:var(--danger); font-size:0.75rem; font-weight:600; padding:2px 8px; border-radius:100px;">${divisionName}</span>
-                <span style="background:#fee2e2; color:var(--danger); font-size:0.75rem; font-weight:600; padding:2px 8px; border-radius:100px;">${subject.name}</span>
-                <span style="background:#fee2e2; color:var(--danger); font-size:0.75rem; font-weight:600; padding:2px 8px; border-radius:100px;">${data?.date ? formatDate(data.date) : "—"}</span>
-                <span style="background:#fee2e2; color:var(--danger); font-size:0.75rem; font-weight:600; padding:2px 8px; border-radius:100px;">${change.type === "removed" ? "Deleted" : "Modified"}</span>
-              </div>
-              <div style="font-size:0.82rem; color:var(--text-2);">
-                <strong>Changed Rolls:</strong> ${rollsDisplay}
-              </div>
-            </div>`;
-          document.getElementById("tamperOverlay").style.display = "flex";
-        }
-      }
-    });
-    auditListeners.push(unsub);
+function showTamperOverlay(tampered) {
+  const rows = tampered.map(r => {
+    const subject = subjects.find(s => s.id === r.subjectId);
+    const subjectName = r.subjectName || subject?.name || "Unknown";
+    const cls = classes.find(c => c.id === (r.classId || subject?.classId));
+    const className = cls?.name || "—";
+    return `
+      <div style="background:var(--danger-light); border:1px solid #fca5a5; border-radius:8px; padding:12px 14px;">
+        <div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:6px;">
+          <span style="background:#fee2e2; color:var(--danger); font-size:0.75rem; font-weight:600; padding:2px 8px; border-radius:100px;">${className}</span>
+          <span style="background:#fee2e2; color:var(--danger); font-size:0.75rem; font-weight:600; padding:2px 8px; border-radius:100px;">${subjectName}</span>
+          <span style="background:#fee2e2; color:var(--danger); font-size:0.75rem; font-weight:600; padding:2px 8px; border-radius:100px;">${formatDate(r.date)}</span>
+        </div>
+        <div style="font-size:0.82rem; color:var(--text-2);">
+          <strong>Changed Rolls:</strong> ${r.changedRolls || "Unknown"}
+        </div>
+      </div>`;
   });
+  document.getElementById("tamperDetailList").innerHTML = rows.join("");
+  document.getElementById("tamperOverlay").style.display = "flex";
 }
 
-// We need raw Firestore functions for the snapshot listener
-import {
-  collection as _col,
-  query as _q,
-  where as _wh,
-  onSnapshot as _snap
-} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-
-window._firestoreCollection = _col;
-window._firestoreQuery = _q;
-window._firestoreWhere = _wh;
-window._firestoreOnSnapshot = _snap;</script>
+function startPeriodicTamperCheck() {
+  if (tamperInterval) clearInterval(tamperInterval);
+  tamperInterval = setInterval(async () => {
+    try {
+      const tampered = await checkTamperOnLogin();
+      if (tampered.length > 0) showTamperOverlay(tampered);
+    } catch(_) {}
+  }, 60000);
+}
+</script>
 </body>
 </html>

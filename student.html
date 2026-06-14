@@ -377,15 +377,16 @@
 
 <script type="module">
 import {
-  auth,
-  getUserProfile, logoutUser,
+  auth, logoutUser, onAuthStateChanged
+} from "./firebase.js";
+import {
   findStudentLinks, joinDivisionByCode, removeStudentLink,
   setStudentRoll,
-  getDivisionSubjects, getDivisions,
-  getStudentAttendanceForSubject,
+  getStudentOverview, getStudentAttendanceForSubject,
+  getDivisions,
   calcAttendancePct, groupByMonth, formatMonthLabel, formatDate,
-  onAuthStateChanged
-} from "./firebase.js";
+  loginCheck
+} from "./api.js";
 
 let currentUser = null;
 let myProfile = null;
@@ -401,29 +402,64 @@ function setLoading(v) {
 onAuthStateChanged(auth, async (user) => {
   if (!user) { window.location.href = "index.html"; return; }
   if (!user.emailVerified) { window.location.href = "index.html"; return; }
-  const profile = await getUserProfile(user.uid);
-  if (!profile || profile.role !== "student") { window.location.href = "index.html"; return; }
-  currentUser = { ...user };
-  myProfile = profile;
-  myRoll = profile.myRoll || null;
-  document.getElementById("userLabel").textContent = profile.name || user.email;
-  document.getElementById("profileName").textContent = profile.name || "-";
-  document.getElementById("profileEmail").textContent = user.email;
-  await loadAllData();
+  try {
+    const data = await loginCheck();
+    if (!data || data.role !== "student") { window.location.href = "index.html"; return; }
+    currentUser = { ...user };
+    myProfile = { name: data.name, email: data.email, role: data.role };
+    myRoll = null; // will be set in loadAllData
+    document.getElementById("userLabel").textContent = data.name || user.email;
+    document.getElementById("profileName").textContent = data.name || "-";
+    document.getElementById("profileEmail").textContent = user.email;
+    await loadAllData();
+  } catch(e) {
+    console.error('Auth check failed:', e);
+    window.location.href = "index.html";
+  }
 });
-
 async function loadAllData() {
   setLoading(true);
-  myLinks = await findStudentLinks(currentUser.uid);
-  const freshProfile = await getUserProfile(currentUser.uid);
-  myRoll = freshProfile?.myRoll || null;
-  myProfile = freshProfile;
-  await buildSubjectData();
+  try {
+    const overview = await getStudentOverview();
+    myRoll = overview.profile?.myRoll || null;
+    myProfile = overview.profile || myProfile;
+    myLinks = overview.links || [];
+
+    // Build allSubjectData from overview response
+    allSubjectData = (overview.subjects || []).map(s => {
+      const records = (s.records || []).map(r => ({ date: r.date, status: r.status }));
+      const pct = s.overall || calcAttendancePct(records);
+      const monthlyPcts = {};
+      if (s.monthly) {
+        for (const [month, data] of Object.entries(s.monthly)) {
+          monthlyPcts[month] = data;
+        }
+      } else {
+        const grouped = groupByMonth(records);
+        for (const [month, recs] of Object.entries(grouped)) {
+          monthlyPcts[month] = calcAttendancePct(recs);
+        }
+      }
+      return {
+        subject: { id: s.id, name: s.name, classId: s.classId, divisionId: s.divisionId },
+        roll: myRoll,
+        classId: s.classId,
+        divisionId: s.divisionId,
+        records,
+        pct,
+        monthlyPcts,
+      };
+    });
+  } catch(e) {
+    console.error('Failed to load overview:', e);
+    // Fallback to individual calls
+    myLinks = await findStudentLinks();
+    allSubjectData = [];
+  }
   renderOverview();
   renderSubjectWise();
   renderAccountPage();
   setLoading(false);
-  // Check for defaulter warning after data is loaded
   checkDefaulterWarning();
 }
 
