@@ -762,18 +762,22 @@ onAuthStateChanged(auth, async (user) => {
 
 async function loadAllData() {
   setLoading(true);
-  classes = await getTeacherClasses();
-  subjects = await getTeacherSubjects();
-  renderClasses();
-  renderSubjectsPage();
-  populateSubjectDropdowns();
-  populateClassDropdowns();
-  populateExportDropdowns();
-  document.getElementById("attDate").value = new Date().toISOString().slice(0,10);
-  setLoading(false);
-
-  // Start periodic tamper check (every 60 seconds)
-  startPeriodicTamperCheck();
+  try {
+    classes = await getTeacherClasses();
+    subjects = await getTeacherSubjects();
+    renderClasses();
+    renderSubjectsPage();
+    populateSubjectDropdowns();
+    populateClassDropdowns();
+    populateExportDropdowns();
+    document.getElementById("attDate").value = new Date().toISOString().slice(0,10);
+    startPeriodicTamperCheck();
+  } catch (e) {
+    console.error("Failed to load dashboard data:", e);
+    alert("Error loading dashboard data: " + e.message);
+  } finally {
+    setLoading(false);
+  }
 }
 
 // ===== PAGE NAVIGATION =====

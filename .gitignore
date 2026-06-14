@@ -10,3 +10,5 @@ yarn-error.log*
 .vercel
 dist
 build
+
+.vercel

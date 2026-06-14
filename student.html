@@ -420,47 +420,52 @@ onAuthStateChanged(auth, async (user) => {
 async function loadAllData() {
   setLoading(true);
   try {
-    const overview = await getStudentOverview();
-    myRoll = overview.profile?.myRoll || null;
-    myProfile = overview.profile || myProfile;
-    myLinks = overview.links || [];
+    try {
+      const overview = await getStudentOverview();
+      myRoll = overview.profile?.myRoll || null;
+      myProfile = overview.profile || myProfile;
+      myLinks = overview.links || [];
 
-    // Build allSubjectData from overview response
-    allSubjectData = (overview.subjects || []).map(s => {
-      const records = (s.records || []).map(r => ({ date: r.date, status: r.status }));
-      const pct = s.overall || calcAttendancePct(records);
-      const monthlyPcts = {};
-      if (s.monthly) {
-        for (const [month, data] of Object.entries(s.monthly)) {
-          monthlyPcts[month] = data;
+      // Build allSubjectData from overview response
+      allSubjectData = (overview.subjects || []).map(s => {
+        const records = (s.records || []).map(r => ({ date: r.date, status: r.status }));
+        const pct = s.overall || calcAttendancePct(records);
+        const monthlyPcts = {};
+        if (s.monthly) {
+          for (const [month, data] of Object.entries(s.monthly)) {
+            monthlyPcts[month] = data;
+          }
+        } else {
+          const grouped = groupByMonth(records);
+          for (const [month, recs] of Object.entries(grouped)) {
+            monthlyPcts[month] = calcAttendancePct(recs);
+          }
         }
-      } else {
-        const grouped = groupByMonth(records);
-        for (const [month, recs] of Object.entries(grouped)) {
-          monthlyPcts[month] = calcAttendancePct(recs);
-        }
-      }
-      return {
-        subject: { id: s.id, name: s.name, classId: s.classId, divisionId: s.divisionId },
-        roll: myRoll,
-        classId: s.classId,
-        divisionId: s.divisionId,
-        records,
-        pct,
-        monthlyPcts,
-      };
-    });
-  } catch(e) {
-    console.error('Failed to load overview:', e);
-    // Fallback to individual calls
-    myLinks = await findStudentLinks();
-    allSubjectData = [];
+        return {
+          subject: { id: s.id, name: s.name, classId: s.classId, divisionId: s.divisionId },
+          roll: myRoll,
+          classId: s.classId,
+          divisionId: s.divisionId,
+          records,
+          pct,
+          monthlyPcts,
+        };
+      });
+    } catch(e) {
+      console.error('Failed to load overview, trying fallback:', e);
+      myLinks = await findStudentLinks();
+      allSubjectData = [];
+    }
+    renderOverview();
+    renderSubjectWise();
+    renderAccountPage();
+    checkDefaulterWarning();
+  } catch (err) {
+    console.error('Failed to load student dashboard data:', err);
+    alert('Error loading dashboard: ' + err.message);
+  } finally {
+    setLoading(false);
   }
-  renderOverview();
-  renderSubjectWise();
-  renderAccountPage();
-  setLoading(false);
-  checkDefaulterWarning();
 }
 
 // ===== DEFAULTER WARNING =====

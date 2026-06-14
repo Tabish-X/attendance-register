@@ -138,13 +138,16 @@ async function handler(req, res) {
     const snapshot = await adminDb
       .collection('classes')
       .where('teacherUid', '==', req.user.uid)
-      .orderBy('createdAt', 'desc')
       .get();
 
     const classes = snapshot.docs.map((doc) => ({
       id: doc.id,
       ...doc.data(),
-    }));
+    })).sort((a, b) => {
+      const tA = a.createdAt ? (a.createdAt.toMillis ? a.createdAt.toMillis() : new Date(a.createdAt).getTime()) : 0;
+      const tB = b.createdAt ? (b.createdAt.toMillis ? b.createdAt.toMillis() : new Date(b.createdAt).getTime()) : 0;
+      return tB - tA; // desc
+    });
 
     return sendSuccess(res, { classes });
   }
