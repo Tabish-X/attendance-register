@@ -1,19 +1,75 @@
 'use strict';
 
-const { adminDb } = require('../_lib/firebaseAdmin');
-const { withTeacher } = require('../_lib/auth');
-const { sendSuccess, sendError } = require('../_lib/errors');
-const { withRateLimit } = require('../_lib/rateLimit');
+const { adminDb } = require('./_lib/firebaseAdmin');
+const { withTeacher } = require('./_lib/auth');
+const { sendSuccess, sendError } = require('./_lib/errors');
+const { withRateLimit } = require('./_lib/rateLimit');
 
-async function handler(req, res) {
-  if (req.method !== 'GET') {
-    return sendError(res, 405, 'Method not allowed');
+// ==========================================
+// SESSION REPORT LOGIC
+// ==========================================
+async function handleSessionReport(req, res) {
+  if (req.method !== 'GET') return sendError(res, 405, 'Method not allowed');
+
+  const { subjectId, date } = req.query;
+  if (!subjectId || !date) {
+    return sendError(res, 400, 'subjectId and date are required');
   }
+
+  const subDoc = await adminDb.collection('subjects').doc(subjectId).get();
+  if (!subDoc.exists || subDoc.data().teacherUid !== req.user.uid) {
+    return sendError(res, 403, 'Access denied');
+  }
+
+  const sessionId = `${subjectId}_${date}`;
+  const attSnap = await adminDb.collection('attendance').doc(sessionId).get();
+  if (!attSnap.exists) {
+    return sendError(res, 404, 'Session not found');
+  }
+
+  const attData = attSnap.data();
+  const subData = subDoc.data();
+
+  const studentsSnap = await adminDb.collection('classes').doc(subData.classId)
+    .collection('divisions').doc(subData.divisionId)
+    .collection('students').get();
+
+  const students = [];
+  for (const sDoc of studentsSnap.docs) {
+    const sData = sDoc.data();
+    let name = null;
+    if (sData.uid) {
+      try {
+        const userDoc = await adminDb.collection('users').doc(sData.uid).get();
+        if (userDoc.exists) name = userDoc.data().name || null;
+      } catch (_) {}
+    }
+    students.push({
+      roll: sData.roll,
+      name,
+      status: attData.records?.[sData.roll] || null,
+    });
+  }
+
+  students.sort((a, b) => parseInt(a.roll) - parseInt(b.roll));
+
+  return sendSuccess(res, {
+    subjectName: subData.name,
+    date: attData.date,
+    records: attData.records,
+    students,
+  });
+}
+
+// ==========================================
+// CLASS REPORT LOGIC
+// ==========================================
+async function handleClassReport(req, res) {
+  if (req.method !== 'GET') return sendError(res, 405, 'Method not allowed');
 
   const { classId } = req.query;
   if (!classId) return sendError(res, 400, 'classId is required');
 
-  // Verify teacher owns class
   const classDoc = await adminDb.collection('classes').doc(classId).get();
   if (!classDoc.exists || classDoc.data().teacherUid !== req.user.uid) {
     return sendError(res, 403, 'Access denied');
@@ -22,7 +78,6 @@ async function handler(req, res) {
   try {
     const className = classDoc.data().name;
 
-    // Get all divisions
     const divsSnap = await adminDb.collection('classes').doc(classId)
       .collection('divisions').get();
 
@@ -31,14 +86,12 @@ async function handler(req, res) {
     for (const divDoc of divsSnap.docs) {
       const divData = divDoc.data();
 
-      // Get subjects for this division
       const subsSnap = await adminDb.collection('subjects')
         .where('classId', '==', classId)
         .where('divisionId', '==', divDoc.id).get();
 
       const subjects = subsSnap.docs.map(s => ({ id: s.id, name: s.data().name }));
 
-      // Get students
       const studentsSnap = await adminDb.collection('classes').doc(classId)
         .collection('divisions').doc(divDoc.id)
         .collection('students').get();
@@ -57,7 +110,6 @@ async function handler(req, res) {
       }
       students.sort((a, b) => parseInt(a.roll) - parseInt(b.roll));
 
-      // Get attendance sessions for all subjects in this division
       const sessions = {};
       for (const sub of subjects) {
         const attSnap = await adminDb.collection('attendance')
@@ -68,7 +120,6 @@ async function handler(req, res) {
         }));
       }
 
-      // Calculate percentages per student per subject
       const percentages = {};
       for (const student of students) {
         percentages[student.roll] = {};
@@ -106,4 +157,20 @@ async function handler(req, res) {
   }
 }
 
-module.exports = withRateLimit(withTeacher(handler), { max: 5, window: 60 });
+// Wrap sub-handlers with their specific rate limits
+const sessionReportHandler = withRateLimit(handleSessionReport, { max: 20, window: 60 });
+const classReportHandler = withRateLimit(handleClassReport, { max: 5, window: 60 });
+
+async function mainHandler(req, res) {
+  const { action } = req.query;
+
+  if (action === 'session') {
+    return sessionReportHandler(req, res);
+  } else if (action === 'class-report') {
+    return classReportHandler(req, res);
+  }
+
+  return sendError(res, 404, 'Not found');
+}
+
+module.exports = withTeacher(mainHandler);

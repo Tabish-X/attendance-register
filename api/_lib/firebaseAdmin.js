@@ -38,7 +38,7 @@ function getApp() {
  */
 function getAuth() {
   if (_auth) return _auth;
-  _auth = getApp().auth ? admin.auth() : admin.auth(getApp());
+  getApp();
   _auth = admin.auth();
   return _auth;
 }
@@ -48,6 +48,7 @@ function getAuth() {
  */
 function getDb() {
   if (_db) return _db;
+  getApp();
   _db = admin.firestore();
   return _db;
 }
