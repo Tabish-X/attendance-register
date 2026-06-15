@@ -372,6 +372,56 @@ tbody tr:hover { background: var(--surface-2); }
 }
 .loading-overlay.show { display: flex; }
 
+/* ===== SKELETON LOADERS ===== */
+.skeleton {
+  background: var(--surface-2);
+  background: linear-gradient(
+    90deg,
+    var(--surface-2) 25%,
+    var(--border) 50%,
+    var(--surface-2) 75%
+  );
+  background-size: 200% 100%;
+  animation: loading-skeleton 1.5s infinite linear;
+  border-radius: var(--radius-sm);
+  color: transparent !important;
+  user-select: none;
+  pointer-events: none;
+}
+
+@keyframes loading-skeleton {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+.skeleton-card {
+  height: 120px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  background: var(--surface);
+}
+
+.skeleton-text {
+  height: 14px;
+  margin-bottom: 8px;
+  border-radius: var(--radius-sm);
+}
+.skeleton-text.title { width: 60%; height: 18px; }
+.skeleton-text.subtitle { width: 35%; height: 10px; }
+.skeleton-text.body { width: 90%; }
+
+.skeleton-table-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
 /* ===== FLEX / GRID UTILITIES ===== */
 .flex { display: flex; }
 .flex-col { flex-direction: column; }

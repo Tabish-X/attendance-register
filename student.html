@@ -516,6 +516,30 @@ function processOverviewData(overview) {
   });
 }
 
+function renderOverviewSkeleton() {
+  const grid = document.getElementById("overviewCardsGrid");
+  if (!grid) return;
+  grid.innerHTML = `
+    <div class="skeleton-card skeleton">
+      <div class="skeleton-text title skeleton"></div>
+      <div class="skeleton-text subtitle skeleton"></div>
+    </div>
+    <div class="skeleton-card skeleton">
+      <div class="skeleton-text title skeleton"></div>
+      <div class="skeleton-text subtitle skeleton"></div>
+    </div>
+  `;
+}
+
+function renderSubjectWiseSkeleton() {
+  const wrap = document.getElementById("subjectWiseWrap");
+  if (!wrap) return;
+  wrap.innerHTML = `
+    <div class="skeleton-card skeleton mb-4" style="height: 60px; border-radius: var(--radius-lg);"></div>
+    <div class="skeleton-card skeleton" style="height: 60px; border-radius: var(--radius-lg);"></div>
+  `;
+}
+
 async function loadAllData(forceFresh = false) {
   // Try to load from cache first for instant rendering
   let cachedOverview = null;
@@ -547,8 +571,9 @@ async function loadAllData(forceFresh = false) {
     return;
   }
 
-  // Fallback: No cache, show active loader
-  setLoading(true);
+  // Fallback: No cache, show skeletons inside containers instead of blocking spinner
+  renderOverviewSkeleton();
+  renderSubjectWiseSkeleton();
   try {
     try {
       const overview = await getStudentOverview();
@@ -566,8 +591,6 @@ async function loadAllData(forceFresh = false) {
   } catch (err) {
     console.error('Failed to load student dashboard data:', err);
     alert('Error loading dashboard: ' + err.message);
-  } finally {
-    setLoading(false);
   }
 }
 
