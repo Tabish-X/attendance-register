@@ -837,35 +837,51 @@ onAuthStateChanged(auth, async (user) => {
 });
 
 function renderClassesSkeleton() {
-  const grid = document.getElementById("classesGrid");
-  if (!grid) return;
-  grid.innerHTML = `
-    <div class="skeleton-card skeleton">
-      <div class="skeleton-text title skeleton"></div>
-      <div class="skeleton-text subtitle skeleton"></div>
-    </div>
-    <div class="skeleton-card skeleton">
-      <div class="skeleton-text title skeleton"></div>
-      <div class="skeleton-text subtitle skeleton"></div>
-    </div>
-    <div class="skeleton-card skeleton">
-      <div class="skeleton-text title skeleton"></div>
-      <div class="skeleton-text subtitle skeleton"></div>
-    </div>
-  `;
+  const list = document.getElementById("classesList");
+  if (!list) return;
+  let html = '';
+  for (let i = 0; i < 3; i++) {
+    html += `
+      <div class="class-card" style="opacity: 0.75;">
+        <div class="class-card-head" style="height: 52px; display: flex; align-items: center;">
+          <div class="skeleton" style="width: 140px; height: 18px;"></div>
+        </div>
+        <div class="class-card-body">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+            <div class="skeleton" style="width: 80px; height: 16px;"></div>
+            <div class="skeleton" style="width: 100px; height: 28px; border-radius: var(--radius-sm);"></div>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 8px;">
+            <div class="skeleton" style="width: 100%; height: 35px;"></div>
+            <div class="skeleton" style="width: 100%; height: 35px;"></div>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+  list.innerHTML = html;
 }
 
 function renderSubjectsSkeleton() {
   const list = document.getElementById("subjectsList");
   if (!list) return;
-  list.innerHTML = `
-    <div class="skeleton-card skeleton" style="height: 80px; margin-bottom: 12px; border-radius: var(--radius-lg);">
-      <div class="skeleton-text title skeleton" style="margin-top: 10px;"></div>
-    </div>
-    <div class="skeleton-card skeleton" style="height: 80px; border-radius: var(--radius-lg);">
-      <div class="skeleton-text title skeleton" style="margin-top: 10px;"></div>
-    </div>
-  `;
+  let html = '<div style="display:flex; flex-direction:column; gap:10px;">';
+  for (let i = 0; i < 3; i++) {
+    html += `
+      <div style="display:flex; align-items:center; justify-content:space-between; padding:10px 0; border-bottom:1px solid var(--border); opacity: 0.75;">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <div class="skeleton" style="width: 110px; height: 16px;"></div>
+          <div class="skeleton" style="width: 90px; height: 14px;"></div>
+        </div>
+        <div class="flex gap-2">
+          <div class="skeleton" style="width: 48px; height: 28px; border-radius: var(--radius-sm);"></div>
+          <div class="skeleton" style="width: 60px; height: 28px; border-radius: var(--radius-sm);"></div>
+        </div>
+      </div>
+    `;
+  }
+  html += '</div>';
+  list.innerHTML = html;
 }
 
 function renderAttendanceSkeleton() {
@@ -901,12 +917,44 @@ function renderHistorySkeleton() {
 }
 
 function renderStudentsSkeleton() {
-  const tableBody = document.getElementById("studentsTableBody");
-  if (!tableBody) return;
-  tableBody.innerHTML = `
-    <tr><td colspan="4"><div class="skeleton" style="height: 22px; width: 100%;"></div></td></tr>
-    <tr><td colspan="4"><div class="skeleton" style="height: 22px; width: 100%;"></div></td></tr>
-    <tr><td colspan="4"><div class="skeleton" style="height: 22px; width: 100%;"></div></td></tr>
+  const wrap = document.getElementById("rollsContent");
+  if (!wrap) return;
+  wrap.innerHTML = `
+    <div class="card" style="opacity: 0.75;">
+      <div class="card-header" style="height: 57px; display: flex; align-items: center;">
+        <div class="skeleton" style="width: 180px; height: 20px;"></div>
+      </div>
+      <div class="card-body" style="padding:0;">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th style="width: 80px;">Roll No.</th>
+                <th>Student</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><div class="skeleton" style="width: 30px; height: 16px;"></div></td>
+                <td><div class="skeleton" style="width: 120px; height: 16px;"></div></td>
+                <td><div class="skeleton" style="width: 60px; height: 24px; border-radius: var(--radius-sm);"></div></td>
+              </tr>
+              <tr>
+                <td><div class="skeleton" style="width: 30px; height: 16px;"></div></td>
+                <td><div class="skeleton" style="width: 100px; height: 16px;"></div></td>
+                <td><div class="skeleton" style="width: 60px; height: 24px; border-radius: var(--radius-sm);"></div></td>
+              </tr>
+              <tr>
+                <td><div class="skeleton" style="width: 30px; height: 16px;"></div></td>
+                <td><div class="skeleton" style="width: 140px; height: 16px;"></div></td>
+                <td><div class="skeleton" style="width: 60px; height: 24px; border-radius: var(--radius-sm);"></div></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
   `;
 }
 
@@ -1090,15 +1138,33 @@ window.handleSaveRolls = async function() {
 };
 
 // ===== RENDER CLASSES =====
+let renderClassesId = 0;
 async function renderClasses() {
+  const currentRenderId = ++renderClassesId;
   const list = document.getElementById("classesList");
   if (!classes.length) {
     list.innerHTML = `<div class="empty-state"><p>No classes yet. Click "New Class" to get started.</p></div>`;
     return;
   }
+
+  // Pre-fetch divisions for all classes in parallel to avoid sequential delays and DOM race conditions
+  const divisionsMap = {};
+  const promises = classes.map(async (cls) => {
+    try {
+      const divs = await getDivisions(cls.id);
+      divisionsMap[cls.id] = divs;
+    } catch (_) {
+      divisionsMap[cls.id] = [];
+    }
+  });
+  await Promise.all(promises);
+
+  // If a newer render call has started, abort this one to prevent double rendering/race conditions
+  if (currentRenderId !== renderClassesId) return;
+
   list.innerHTML = "";
   for (const cls of classes) {
-    const divs = await getDivisions(cls.id);
+    const divs = divisionsMap[cls.id] || [];
     const card = document.createElement("div");
     card.className = "class-card";
     card.innerHTML = `

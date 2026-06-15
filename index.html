@@ -66,40 +66,40 @@ body { background: var(--bg); }
     <div id="alertBox" style="display:none; margin-bottom: 12px;"></div>
 
     <!-- ===== LOGIN FORM ===== -->
-    <div id="formLogin" class="auth-form">
+    <form id="formLogin" class="auth-form" onsubmit="event.preventDefault(); handleLogin();">
       <div class="input-group">
         <label>Email address</label>
-        <input class="field" type="email" id="loginEmail" placeholder="Your email" />
+        <input class="field" type="email" id="loginEmail" placeholder="Your email" required />
       </div>
       <div class="input-group">
         <label>Password</label>
         <div class="input-wrap">
-          <input class="has-eye" type="password" id="loginPassword" placeholder="Your password" />
+          <input class="has-eye" type="password" id="loginPassword" placeholder="Your password" required />
           <button class="eye-btn" type="button" onclick="toggleEye('loginPassword', this)">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
           </button>
         </div>
       </div>
-      <button class="btn btn-primary btn-full" onclick="handleLogin()">Sign In</button>
+      <button type="submit" class="btn btn-primary btn-full">Sign In</button>
       <div class="auth-switch">
         Forgot password? <a href="#" onclick="setMode('reset')">Reset here</a>
       </div>
-    </div>
+    </form>
 
     <!-- ===== SIGNUP FORM ===== -->
-    <div id="formSignup" class="auth-form" style="display:none;">
+    <form id="formSignup" class="auth-form" style="display:none;" onsubmit="event.preventDefault(); handleSignup();">
       <div class="input-group">
         <label>Full name</label>
-        <input class="field" type="text" id="signupName" placeholder="Your name" />
+        <input class="field" type="text" id="signupName" placeholder="Your name" required />
       </div>
       <div class="input-group">
         <label>Email address</label>
-        <input class="field" type="email" id="signupEmail" placeholder="Your email" />
+        <input class="field" type="email" id="signupEmail" placeholder="Your email" required />
       </div>
       <div class="input-group">
         <label>Password</label>
         <div class="input-wrap">
-          <input class="has-eye" type="password" id="signupPassword" placeholder="Set a password" />
+          <input class="has-eye" type="password" id="signupPassword" placeholder="Set a password" required />
           <button class="eye-btn" type="button" onclick="toggleEye('signupPassword', this)">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
           </button>
@@ -115,23 +115,23 @@ body { background: var(--bg); }
           </button>
         </div>
       </div>
-      <button class="btn btn-primary btn-full" onclick="handleSignup()">Create Account</button>
+      <button type="submit" class="btn btn-primary btn-full">Create Account</button>
       <div class="auth-switch">
         Already have an account? <a href="#" onclick="setMode('login')">Sign in</a>
       </div>
-    </div>
+    </form>
 
     <!-- ===== RESET FORM ===== -->
-    <div id="formReset" class="auth-form" style="display:none;">
+    <form id="formReset" class="auth-form" style="display:none;" onsubmit="event.preventDefault(); handleReset();">
       <div class="input-group">
         <label>Email address</label>
-        <input class="field" type="email" id="resetEmail" placeholder="Your email" />
+        <input class="field" type="email" id="resetEmail" placeholder="Your email" required />
       </div>
-      <button class="btn btn-primary btn-full" onclick="handleReset()">Send Reset Link</button>
+      <button type="submit" class="btn btn-primary btn-full">Send Reset Link</button>
       <div class="auth-switch">
         Remember password? <a href="#" onclick="setMode('login')">Sign in</a>
       </div>
-    </div>
+    </form>
 
     <!-- ===== VERIFY EMAIL STATE ===== -->
     <div id="formVerify" style="display:none;">
