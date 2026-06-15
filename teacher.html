@@ -1630,7 +1630,7 @@ function renderAttGrid(wrap) {
       ${attStudents.map(s => {
         const status = attRecords[s.roll] || "A";
         return `<div class="att-mark-cell ${status === 'P' ? 'present' : 'absent'}" 
-          onclick="toggleCell('${s.roll}')" data-roll="${s.roll}">
+          onclick="toggleCell('${s.roll}')" data-roll="${s.roll}" title="${s.name || 'Roll ' + s.roll}">
           <div class="roll-num">${s.roll}</div>
           <div class="status-badge">${status === 'P' ? 'P' : 'A'}</div>
         </div>`;
