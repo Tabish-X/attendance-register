@@ -357,7 +357,19 @@
       </div>
       <div class="card mb-5">
         <div class="card-body">
-          <div class="grid-2 mb-3" style="gap: 12px;">
+          <div class="grid-4 mb-3" style="gap: 12px; display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));">
+            <div class="input-group">
+              <label>Select Class</label>
+              <select class="field" id="attClass" onchange="loadDivisionsForAttendance()">
+                <option value="">Choose class...</option>
+              </select>
+            </div>
+            <div class="input-group">
+              <label>Select Division</label>
+              <select class="field" id="attDivision" onchange="loadSubjectsForAttendance()">
+                <option value="">Choose division...</option>
+              </select>
+            </div>
             <div class="input-group">
               <label>Select Subject</label>
               <select class="field" id="attSubject" onchange="loadAttendanceGrid()">
@@ -377,7 +389,7 @@
         </div>
       </div>
       <div id="attGridWrap">
-        <div class="empty-state"><p>Select a subject and date to start marking attendance.</p></div>
+        <div class="empty-state"><p>Select class, division, subject, and date to start marking attendance.</p></div>
       </div>
     </div>
 
@@ -389,16 +401,30 @@
       </div>
       <div class="card mb-4">
         <div class="card-body">
-          <div class="input-group">
-            <label>Select Subject to view history</label>
-            <select class="field" id="histSubject" onchange="loadHistory()">
-              <option value="">Choose subject...</option>
-            </select>
+          <div class="grid-3 mb-3" style="gap: 12px; display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));">
+            <div class="input-group">
+              <label>Select Class</label>
+              <select class="field" id="histClass" onchange="loadDivisionsForHistory()">
+                <option value="">Choose class...</option>
+              </select>
+            </div>
+            <div class="input-group">
+              <label>Select Division</label>
+              <select class="field" id="histDivision" onchange="loadSubjectsForHistory()">
+                <option value="">Choose division...</option>
+              </select>
+            </div>
+            <div class="input-group">
+              <label>Select Subject</label>
+              <select class="field" id="histSubject" onchange="loadHistory()">
+                <option value="">Choose subject...</option>
+              </select>
+            </div>
           </div>
         </div>
       </div>
       <div id="historyList">
-        <div class="empty-state"><p>Select a subject to view attendance history.</p></div>
+        <div class="empty-state"><p>Select class, division, and subject to view attendance history.</p></div>
       </div>
     </div>
 
@@ -1288,37 +1314,35 @@ function renderSubjectsPage() {
 
 // ===== POPULATE DROPDOWNS =====
 function populateSubjectDropdowns() {
-  const classMap = {};
-  classes.forEach(c => classMap[c.id] = c.name);
-
   // Subject page class dropdown
   const sc = document.getElementById("subjectClass");
   const sv = sc.value;
   sc.innerHTML = `<option value="">Choose class...</option>` +
     classes.map(c => `<option value="${c.id}">${c.name}</option>`).join("");
   if (sv) sc.value = sv;
-
-  // Attendance subject dropdown
-  const attSub = document.getElementById("attSubject");
-  const attV = attSub.value;
-  attSub.innerHTML = `<option value="">Choose subject...</option>` +
-    subjects.map(s => `<option value="${s.id}">${s.name} (${classMap[s.classId] || s.classId})</option>`).join("");
-  if (attV) attSub.value = attV;
-
-  // History subject dropdown
-  const histSub = document.getElementById("histSubject");
-  const histV = histSub.value;
-  histSub.innerHTML = `<option value="">Choose subject...</option>` +
-    subjects.map(s => `<option value="${s.id}">${s.name} (${classMap[s.classId] || s.classId})</option>`).join("");
-  if (histV) histSub.value = histV;
 }
 
 function populateClassDropdowns() {
+  // Roll numbers page class dropdown
   const rc = document.getElementById("rollClass");
   const rv = rc.value;
   rc.innerHTML = `<option value="">Choose class...</option>` +
     classes.map(c => `<option value="${c.id}">${c.name}</option>`).join("");
   if (rv) rc.value = rv;
+
+  // Attendance page class dropdown
+  const ac = document.getElementById("attClass");
+  const av = ac.value;
+  ac.innerHTML = `<option value="">Choose class...</option>` +
+    classes.map(c => `<option value="${c.id}">${c.name}</option>`).join("");
+  if (av) ac.value = av;
+
+  // History page class dropdown
+  const hc = document.getElementById("histClass");
+  const hv = hc.value;
+  hc.innerHTML = `<option value="">Choose class...</option>` +
+    classes.map(c => `<option value="${c.id}">${c.name}</option>`).join("");
+  if (hv) hc.value = hv;
 }
 
 window.loadDivisionsForSubject = async function() {
@@ -1347,6 +1371,72 @@ window.loadDivisionsForRoll = async function() {
     o.value = d.id;
     o.textContent = d.name;
     sel.appendChild(o);
+  });
+};
+
+window.loadDivisionsForAttendance = async function() {
+  const classId = document.getElementById("attClass").value;
+  const divSel = document.getElementById("attDivision");
+  const subSel = document.getElementById("attSubject");
+  divSel.innerHTML = `<option value="">Choose division...</option>`;
+  subSel.innerHTML = `<option value="">Choose subject...</option>`;
+  document.getElementById("attGridWrap").innerHTML = `<div class="empty-state"><p>Select class, division, subject, and date.</p></div>`;
+  if (!classId) return;
+  const divs = await getDivisions(classId);
+  divs.forEach(d => {
+    const o = document.createElement("option");
+    o.value = d.id;
+    o.textContent = d.name;
+    divSel.appendChild(o);
+  });
+};
+
+window.loadSubjectsForAttendance = function() {
+  const classId = document.getElementById("attClass").value;
+  const divId = document.getElementById("attDivision").value;
+  const subSel = document.getElementById("attSubject");
+  subSel.innerHTML = `<option value="">Choose subject...</option>`;
+  document.getElementById("attGridWrap").innerHTML = `<div class="empty-state"><p>Select class, division, subject, and date.</p></div>`;
+  if (!classId || !divId) return;
+  const filtered = subjects.filter(s => s.classId === classId && s.divisionId === divId);
+  filtered.forEach(s => {
+    const o = document.createElement("option");
+    o.value = s.id;
+    o.textContent = s.name;
+    subSel.appendChild(o);
+  });
+};
+
+window.loadDivisionsForHistory = async function() {
+  const classId = document.getElementById("histClass").value;
+  const divSel = document.getElementById("histDivision");
+  const subSel = document.getElementById("histSubject");
+  divSel.innerHTML = `<option value="">Choose division...</option>`;
+  subSel.innerHTML = `<option value="">Choose subject...</option>`;
+  document.getElementById("historyList").innerHTML = `<div class="empty-state"><p>Select class, division, and subject.</p></div>`;
+  if (!classId) return;
+  const divs = await getDivisions(classId);
+  divs.forEach(d => {
+    const o = document.createElement("option");
+    o.value = d.id;
+    o.textContent = d.name;
+    divSel.appendChild(o);
+  });
+};
+
+window.loadSubjectsForHistory = function() {
+  const classId = document.getElementById("histClass").value;
+  const divId = document.getElementById("histDivision").value;
+  const subSel = document.getElementById("histSubject");
+  subSel.innerHTML = `<option value="">Choose subject...</option>`;
+  document.getElementById("historyList").innerHTML = `<div class="empty-state"><p>Select class, division, and subject.</p></div>`;
+  if (!classId || !divId) return;
+  const filtered = subjects.filter(s => s.classId === classId && s.divisionId === divId);
+  filtered.forEach(s => {
+    const o = document.createElement("option");
+    o.value = s.id;
+    o.textContent = s.name;
+    subSel.appendChild(o);
   });
 };
 
