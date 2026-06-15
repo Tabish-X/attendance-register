@@ -580,39 +580,12 @@ function renderSubjectWiseSkeleton() {
 }
 
 async function loadAllData(forceFresh = false) {
-  // Try to load from cache first for instant rendering
-  let cachedOverview = null;
-  if (!forceFresh) {
-    try {
-      cachedOverview = JSON.parse(localStorage.getItem(`cachedOverview_${currentUser.uid}`));
-    } catch(_) {}
-  }
-
-  if (cachedOverview) {
-    processOverviewData(cachedOverview);
-    renderOverview();
-    renderSubjectWise();
-    renderAccountPage();
-    checkDefaulterWarning();
-
-    // Background fresh fetch
-    getStudentOverview().then(overview => {
-      localStorage.setItem(`cachedOverview_${currentUser.uid}`, JSON.stringify(overview));
-      processOverviewData(overview);
-      
-      // Silent re-render
-      renderOverview();
-      renderSubjectWise();
-      renderAccountPage();
-      checkDefaulterWarning();
-    }).catch(e => console.error("Background overview refresh failed:", e));
-
-    return;
-  }
-
-  // Fallback: No cache, show skeletons inside containers instead of blocking spinner
+  // Always render skeletons first for loading feedback
   renderOverviewSkeleton();
   renderSubjectWiseSkeleton();
+
+  const startTime = Date.now();
+
   try {
     try {
       const overview = await getStudentOverview();
@@ -623,13 +596,35 @@ async function loadAllData(forceFresh = false) {
       myLinks = await findStudentLinks();
       allSubjectData = [];
     }
+
+    // Wait for a minimum of 600ms to make the skeleton UI clearly visible
+    const elapsed = Date.now() - startTime;
+    await new Promise(resolve => setTimeout(resolve, Math.max(0, 600 - elapsed)));
+
     renderOverview();
     renderSubjectWise();
     renderAccountPage();
     checkDefaulterWarning();
-  } catch (err) {
-    console.error('Failed to load student dashboard data:', err);
-    alert('Error loading dashboard: ' + err.message);
+  } catch (e) {
+    console.error("Fresh load failed, using cache if available:", e);
+    let cachedOverview = null;
+    try {
+      cachedOverview = JSON.parse(localStorage.getItem(`cachedOverview_${currentUser.uid}`));
+    } catch(_) {}
+
+    if (cachedOverview) {
+      processOverviewData(cachedOverview);
+      
+      const elapsed = Date.now() - startTime;
+      await new Promise(resolve => setTimeout(resolve, Math.max(0, 600 - elapsed)));
+
+      renderOverview();
+      renderSubjectWise();
+      renderAccountPage();
+      checkDefaulterWarning();
+    } else {
+      alert("Error loading student data: " + e.message);
+    }
   }
 }
 

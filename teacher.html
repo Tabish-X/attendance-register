@@ -978,46 +978,12 @@ function renderStudentsSkeleton() {
 }
 
 async function loadAllData() {
-  // Try to load from cache first for instant rendering
-  let cachedClasses = null;
-  let cachedSubjects = null;
-  try {
-    cachedClasses = JSON.parse(localStorage.getItem(`cachedClasses_${currentUser.uid}`));
-    cachedSubjects = JSON.parse(localStorage.getItem(`cachedSubjects_${currentUser.uid}`));
-  } catch(_) {}
-
-  if (cachedClasses && cachedSubjects) {
-    classes = cachedClasses;
-    subjects = cachedSubjects;
-    renderClasses();
-    renderSubjectsPage();
-    populateSubjectDropdowns();
-    populateClassDropdowns();
-    populateExportDropdowns();
-    document.getElementById("attDate").value = new Date().toISOString().slice(0,10);
-    
-    // Background fresh fetch
-    Promise.all([getTeacherClasses(), getTeacherSubjects()]).then(([cData, sData]) => {
-      classes = cData;
-      subjects = sData;
-      localStorage.setItem(`cachedClasses_${currentUser.uid}`, JSON.stringify(classes));
-      localStorage.setItem(`cachedSubjects_${currentUser.uid}`, JSON.stringify(subjects));
-      
-      // Silent re-render
-      renderClasses();
-      renderSubjectsPage();
-      populateSubjectDropdowns();
-      populateClassDropdowns();
-      populateExportDropdowns();
-    }).catch(e => console.error("Background refresh failed:", e));
-
-    startPeriodicTamperCheck();
-    return;
-  }
-
-  // Fallback: No cache, show skeletons inside grids instead of blocking spinner
+  // Always show skeletons first to give loading feedback
   renderClassesSkeleton();
   renderSubjectsSkeleton();
+
+  const startTime = Date.now();
+
   try {
     const [cData, sData] = await Promise.all([
       getTeacherClasses(),
@@ -1028,6 +994,10 @@ async function loadAllData() {
     localStorage.setItem(`cachedClasses_${currentUser.uid}`, JSON.stringify(classes));
     localStorage.setItem(`cachedSubjects_${currentUser.uid}`, JSON.stringify(subjects));
 
+    // Wait for a minimum of 600ms so the user can see the skeleton transition
+    const elapsed = Date.now() - startTime;
+    await new Promise(resolve => setTimeout(resolve, Math.max(0, 600 - elapsed)));
+
     renderClasses();
     renderSubjectsPage();
     populateSubjectDropdowns();
@@ -1036,8 +1006,31 @@ async function loadAllData() {
     document.getElementById("attDate").value = new Date().toISOString().slice(0,10);
     startPeriodicTamperCheck();
   } catch (e) {
-    console.error("Failed to load dashboard data:", e);
-    alert("Error loading dashboard data: " + e.message);
+    console.error("Fresh fetch failed, using cache if available:", e);
+    let cachedClasses = null;
+    let cachedSubjects = null;
+    try {
+      cachedClasses = JSON.parse(localStorage.getItem(`cachedClasses_${currentUser.uid}`));
+      cachedSubjects = JSON.parse(localStorage.getItem(`cachedSubjects_${currentUser.uid}`));
+    } catch(_) {}
+
+    if (cachedClasses && cachedSubjects) {
+      classes = cachedClasses;
+      subjects = cachedSubjects;
+      
+      const elapsed = Date.now() - startTime;
+      await new Promise(resolve => setTimeout(resolve, Math.max(0, 600 - elapsed)));
+
+      renderClasses();
+      renderSubjectsPage();
+      populateSubjectDropdowns();
+      populateClassDropdowns();
+      populateExportDropdowns();
+      document.getElementById("attDate").value = new Date().toISOString().slice(0,10);
+      startPeriodicTamperCheck();
+    } else {
+      alert("Error loading dashboard data: " + e.message);
+    }
   }
 }
 
@@ -1427,9 +1420,12 @@ window.loadRollNumbers = async function() {
     document.getElementById("rollAttFilter").style.display = "none";
     return;
   }
-  setLoading(true);
+  renderStudentsSkeleton();
+  const startTime = Date.now();
   const students = await getDivisionStudents(classId, divId);
-  setLoading(false);
+
+  const elapsed = Date.now() - startTime;
+  await new Promise(resolve => setTimeout(resolve, Math.max(0, 400 - elapsed)));
 
   if (!students.length) {
     wrap.innerHTML = `<div class="card"><div class="card-body">
@@ -1535,6 +1531,7 @@ window.loadRollAttendance = async function() {
     return;
   }
   renderStudentsSkeleton();
+  const startTime = Date.now();
 
   // Get all sessions for this subject in this division
   const allSessions = await getSubjectAttendance(subjectId, divisionId);
@@ -1548,6 +1545,8 @@ window.loadRollAttendance = async function() {
     // No sessions that month — everyone shows 0%
     const emptyMap = {};
     students.forEach(s => { emptyMap[s.roll] = 0; });
+    const elapsed = Date.now() - startTime;
+    await new Promise(resolve => setTimeout(resolve, Math.max(0, 400 - elapsed)));
     await renderRollTable(emptyMap);
     return;
   }
@@ -1571,6 +1570,8 @@ window.loadRollAttendance = async function() {
     attMap[s.roll] = total === 0 ? 0 : parseFloat(((present / total) * 100).toFixed(2));
   });
 
+  const elapsed = Date.now() - startTime;
+  await new Promise(resolve => setTimeout(resolve, Math.max(0, 400 - elapsed)));
   await renderRollTable(attMap);
 };
 
@@ -1592,6 +1593,7 @@ window.loadAttendanceGrid = async function() {
     return;
   }
   renderAttendanceSkeleton();
+  const startTime = Date.now();
   // Get subject info
   const subject = subjects.find(s => s.id === subjectId);
   if (!subject) { return; }
@@ -1605,6 +1607,9 @@ window.loadAttendanceGrid = async function() {
   attStudents.forEach(s => {
     if (!attRecords[s.roll]) attRecords[s.roll] = "A";
   });
+
+  const elapsed = Date.now() - startTime;
+  await new Promise(resolve => setTimeout(resolve, Math.max(0, 400 - elapsed)));
   renderAttGrid(wrap);
 };
 
@@ -1685,7 +1690,12 @@ window.loadHistory = async function() {
   const list = document.getElementById("historyList");
   if (!subjectId || !divisionId) { list.innerHTML = `<div class="empty-state"><p>Select a subject and division.</p></div>`; return; }
   renderHistorySkeleton();
+  const startTime = Date.now();
   const sessions = await getSubjectAttendance(subjectId, divisionId);
+  
+  const elapsed = Date.now() - startTime;
+  await new Promise(resolve => setTimeout(resolve, Math.max(0, 400 - elapsed)));
+
   if (!sessions.length) {
     list.innerHTML = `<div class="empty-state"><p>No attendance sessions recorded for this subject.</p></div>`;
     return;
