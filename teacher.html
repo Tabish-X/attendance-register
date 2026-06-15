@@ -315,24 +315,16 @@
     <div class="page" id="page-subjects">
       <div class="page-header">
         <h2>Subjects</h2>
-        <p class="text-sm text-muted">Add subjects to a class and division.</p>
+        <p class="text-sm text-muted">Add subjects to a class.</p>
       </div>
       <div class="card mb-5">
         <div class="card-header"><h3>Add New Subject</h3></div>
         <div class="card-body">
-          <div class="grid-2 mb-3">
-            <div class="input-group">
-              <label>Select Class</label>
-              <select class="field" id="subjectClass" onchange="loadDivisionsForSubject()">
-                <option value="">Choose class...</option>
-              </select>
-            </div>
-            <div class="input-group">
-              <label>Select Division</label>
-              <select class="field" id="subjectDivision">
-                <option value="">Choose division...</option>
-              </select>
-            </div>
+          <div class="input-group mb-3">
+            <label>Select Class</label>
+            <select class="field" id="subjectClass">
+              <option value="" disabled selected hidden>Choose class...</option>
+            </select>
           </div>
           <div class="input-group mb-3">
             <label>Subject Name</label>
@@ -361,19 +353,19 @@
             <div class="input-group">
               <label>Select Class</label>
               <select class="field" id="attClass" onchange="loadDivisionsForAttendance()">
-                <option value="">Choose class...</option>
+                <option value="" disabled selected hidden>Choose class...</option>
               </select>
             </div>
             <div class="input-group">
               <label>Select Division</label>
               <select class="field" id="attDivision" onchange="loadSubjectsForAttendance()">
-                <option value="">Choose division...</option>
+                <option value="" disabled selected hidden>Choose division...</option>
               </select>
             </div>
             <div class="input-group">
               <label>Select Subject</label>
               <select class="field" id="attSubject" onchange="loadAttendanceGrid()">
-                <option value="">Choose subject...</option>
+                <option value="" disabled selected hidden>Choose subject...</option>
               </select>
             </div>
             <div class="input-group">
@@ -405,19 +397,19 @@
             <div class="input-group">
               <label>Select Class</label>
               <select class="field" id="histClass" onchange="loadDivisionsForHistory()">
-                <option value="">Choose class...</option>
+                <option value="" disabled selected hidden>Choose class...</option>
               </select>
             </div>
             <div class="input-group">
               <label>Select Division</label>
               <select class="field" id="histDivision" onchange="loadSubjectsForHistory()">
-                <option value="">Choose division...</option>
+                <option value="" disabled selected hidden>Choose division...</option>
               </select>
             </div>
             <div class="input-group">
               <label>Select Subject</label>
               <select class="field" id="histSubject" onchange="loadHistory()">
-                <option value="">Choose subject...</option>
+                <option value="" disabled selected hidden>Choose subject...</option>
               </select>
             </div>
           </div>
@@ -440,13 +432,13 @@
             <div class="input-group">
               <label>Select Class</label>
               <select class="field" id="rollClass" onchange="loadDivisionsForRoll()">
-                <option value="">Choose class...</option>
+                <option value="" disabled selected hidden>Choose class...</option>
               </select>
             </div>
             <div class="input-group">
               <label>Select Division</label>
               <select class="field" id="rollDivision" onchange="loadRollNumbers()">
-                <option value="">Choose division...</option>
+                <option value="" disabled selected hidden>Choose division...</option>
               </select>
             </div>
           </div>
@@ -457,7 +449,7 @@
               <div class="input-group">
                 <label>Subject</label>
                 <select class="field" id="rollAttSubject" onchange="loadRollAttendance()">
-                  <option value="">Choose subject...</option>
+                  <option value="" disabled selected hidden>Choose subject...</option>
                 </select>
               </div>
               <div class="input-group">
@@ -491,13 +483,13 @@
             <div class="input-group">
               <label>Select Class</label>
               <select class="field" id="exportClass" onchange="loadExportDivisions()">
-                <option value="">Choose class...</option>
+                <option value="" disabled selected hidden>Choose class...</option>
               </select>
             </div>
             <div class="input-group">
               <label>Select Subject</label>
               <select class="field" id="exportSubject">
-                <option value="">Choose subject...</option>
+                <option value="" disabled selected hidden>Choose subject...</option>
               </select>
             </div>
           </div>
@@ -776,6 +768,7 @@ let attRecords = {};  // {roll: "P"|"A"}
 
 // Session edit state
 let editSessionSubjectId = null;
+let editSessionDivisionId = null;
 let editSessionDate = null;
 let editSessionRolls = [];
 let editSessionRecords = {};
@@ -1262,11 +1255,10 @@ window.handleRegenCode = async function(classId, divId, btn) {
 // ===== SUBJECTS =====
 window.handleAddSubject = async function() {
   const classId = document.getElementById("subjectClass").value;
-  const divisionId = document.getElementById("subjectDivision").value;
   const name = document.getElementById("subjectName").value.trim();
-  if (!classId || !divisionId || !name) { alert("Please fill all fields."); return; }
+  if (!classId || !name) { alert("Please fill all fields."); return; }
   setLoading(true);
-  await createSubject(currentUser.uid, classId, divisionId, name);
+  await createSubject(classId, name);
   document.getElementById("subjectName").value = "";
   await loadAllData();
 };
@@ -1317,7 +1309,7 @@ function populateSubjectDropdowns() {
   // Subject page class dropdown
   const sc = document.getElementById("subjectClass");
   const sv = sc.value;
-  sc.innerHTML = `<option value="">Choose class...</option>` +
+  sc.innerHTML = `<option value="" disabled selected hidden>Choose class...</option>` +
     classes.map(c => `<option value="${c.id}">${c.name}</option>`).join("");
   if (sv) sc.value = sv;
 }
@@ -1326,43 +1318,29 @@ function populateClassDropdowns() {
   // Roll numbers page class dropdown
   const rc = document.getElementById("rollClass");
   const rv = rc.value;
-  rc.innerHTML = `<option value="">Choose class...</option>` +
+  rc.innerHTML = `<option value="" disabled selected hidden>Choose class...</option>` +
     classes.map(c => `<option value="${c.id}">${c.name}</option>`).join("");
   if (rv) rc.value = rv;
 
   // Attendance page class dropdown
   const ac = document.getElementById("attClass");
   const av = ac.value;
-  ac.innerHTML = `<option value="">Choose class...</option>` +
+  ac.innerHTML = `<option value="" disabled selected hidden>Choose class...</option>` +
     classes.map(c => `<option value="${c.id}">${c.name}</option>`).join("");
   if (av) ac.value = av;
 
   // History page class dropdown
   const hc = document.getElementById("histClass");
   const hv = hc.value;
-  hc.innerHTML = `<option value="">Choose class...</option>` +
+  hc.innerHTML = `<option value="" disabled selected hidden>Choose class...</option>` +
     classes.map(c => `<option value="${c.id}">${c.name}</option>`).join("");
   if (hv) hc.value = hv;
 }
 
-window.loadDivisionsForSubject = async function() {
-  const classId = document.getElementById("subjectClass").value;
-  const sel = document.getElementById("subjectDivision");
-  sel.innerHTML = `<option value="">Choose division...</option>`;
-  if (!classId) return;
-  const divs = await getDivisions(classId);
-  divs.forEach(d => {
-    const o = document.createElement("option");
-    o.value = d.id;
-    o.textContent = d.name;
-    sel.appendChild(o);
-  });
-};
-
 window.loadDivisionsForRoll = async function() {
   const classId = document.getElementById("rollClass").value;
   const sel = document.getElementById("rollDivision");
-  sel.innerHTML = `<option value="">Choose division...</option>`;
+  sel.innerHTML = `<option value="" disabled selected hidden>Choose division...</option>`;
   document.getElementById("rollsContent").innerHTML = `<div class="empty-state"><p>Select a class and division.</p></div>`;
   if (!classId) return;
   const divs = await getDivisions(classId);
@@ -1378,8 +1356,8 @@ window.loadDivisionsForAttendance = async function() {
   const classId = document.getElementById("attClass").value;
   const divSel = document.getElementById("attDivision");
   const subSel = document.getElementById("attSubject");
-  divSel.innerHTML = `<option value="">Choose division...</option>`;
-  subSel.innerHTML = `<option value="">Choose subject...</option>`;
+  divSel.innerHTML = `<option value="" disabled selected hidden>Choose division...</option>`;
+  subSel.innerHTML = `<option value="" disabled selected hidden>Choose subject...</option>`;
   document.getElementById("attGridWrap").innerHTML = `<div class="empty-state"><p>Select class, division, subject, and date.</p></div>`;
   if (!classId) return;
   const divs = await getDivisions(classId);
@@ -1395,10 +1373,10 @@ window.loadSubjectsForAttendance = function() {
   const classId = document.getElementById("attClass").value;
   const divId = document.getElementById("attDivision").value;
   const subSel = document.getElementById("attSubject");
-  subSel.innerHTML = `<option value="">Choose subject...</option>`;
+  subSel.innerHTML = `<option value="" disabled selected hidden>Choose subject...</option>`;
   document.getElementById("attGridWrap").innerHTML = `<div class="empty-state"><p>Select class, division, subject, and date.</p></div>`;
   if (!classId || !divId) return;
-  const filtered = subjects.filter(s => s.classId === classId && s.divisionId === divId);
+  const filtered = subjects.filter(s => s.classId === classId);
   filtered.forEach(s => {
     const o = document.createElement("option");
     o.value = s.id;
@@ -1411,8 +1389,8 @@ window.loadDivisionsForHistory = async function() {
   const classId = document.getElementById("histClass").value;
   const divSel = document.getElementById("histDivision");
   const subSel = document.getElementById("histSubject");
-  divSel.innerHTML = `<option value="">Choose division...</option>`;
-  subSel.innerHTML = `<option value="">Choose subject...</option>`;
+  divSel.innerHTML = `<option value="" disabled selected hidden>Choose division...</option>`;
+  subSel.innerHTML = `<option value="" disabled selected hidden>Choose subject...</option>`;
   document.getElementById("historyList").innerHTML = `<div class="empty-state"><p>Select class, division, and subject.</p></div>`;
   if (!classId) return;
   const divs = await getDivisions(classId);
@@ -1428,10 +1406,10 @@ window.loadSubjectsForHistory = function() {
   const classId = document.getElementById("histClass").value;
   const divId = document.getElementById("histDivision").value;
   const subSel = document.getElementById("histSubject");
-  subSel.innerHTML = `<option value="">Choose subject...</option>`;
+  subSel.innerHTML = `<option value="" disabled selected hidden>Choose subject...</option>`;
   document.getElementById("historyList").innerHTML = `<div class="empty-state"><p>Select class, division, and subject.</p></div>`;
   if (!classId || !divId) return;
-  const filtered = subjects.filter(s => s.classId === classId && s.divisionId === divId);
+  const filtered = subjects.filter(s => s.classId === classId);
   filtered.forEach(s => {
     const o = document.createElement("option");
     o.value = s.id;
@@ -1465,9 +1443,9 @@ window.loadRollNumbers = async function() {
   }
 
   // Populate subject dropdown with only this teacher's subjects for this division
-  const divSubjects = subjects.filter(s => s.classId === classId && s.divisionId === divId);
+  const divSubjects = subjects.filter(s => s.classId === classId);
   const subjectSel = document.getElementById("rollAttSubject");
-  subjectSel.innerHTML = `<option value="">Choose subject...</option>` +
+  subjectSel.innerHTML = `<option value="" disabled selected hidden>Choose subject...</option>` +
     divSubjects.map(s => `<option value="${s.id}">${s.name}</option>`).join("");
 
   // Set current month as default
@@ -1550,15 +1528,16 @@ async function renderRollTable(attMap) {
 // Calculate per-roll attendance % for the selected subject and month
 window.loadRollAttendance = async function() {
   const subjectId = document.getElementById("rollAttSubject").value;
+  const divisionId = document.getElementById("rollDivision").value;
   const month = document.getElementById("rollAttMonth").value; // "YYYY-MM"
-  if (!subjectId || !month) {
+  if (!subjectId || !divisionId || !month) {
     await renderRollTable({});
     return;
   }
   renderStudentsSkeleton();
 
-  // Get all sessions for this subject
-  const allSessions = await getSubjectAttendance(subjectId);
+  // Get all sessions for this subject in this division
+  const allSessions = await getSubjectAttendance(subjectId, divisionId);
 
   // Keep only sessions in the selected month
   const monthSessions = allSessions.filter(s => s.date && s.date.startsWith(month));
@@ -1605,10 +1584,11 @@ window.handleDeleteRoll = async function(classId, divId, docId) {
 // ===== ATTENDANCE MARKING =====
 window.loadAttendanceGrid = async function() {
   const subjectId = document.getElementById("attSubject").value;
+  const divisionId = document.getElementById("attDivision").value;
   const date = document.getElementById("attDate").value;
   const wrap = document.getElementById("attGridWrap");
-  if (!subjectId || !date) {
-    wrap.innerHTML = `<div class="empty-state"><p>Select a subject and date to start marking attendance.</p></div>`;
+  if (!subjectId || !divisionId || !date) {
+    wrap.innerHTML = `<div class="empty-state"><p>Select class, division, subject, and date.</p></div>`;
     return;
   }
   renderAttendanceSkeleton();
@@ -1616,10 +1596,10 @@ window.loadAttendanceGrid = async function() {
   const subject = subjects.find(s => s.id === subjectId);
   if (!subject) { return; }
   // Get students in division
-  const students = await getDivisionStudents(subject.classId, subject.divisionId);
+  const students = await getDivisionStudents(subject.classId, divisionId);
   attStudents = students.sort((a,b) => parseInt(a.roll) - parseInt(b.roll));
   // Load existing session
-  const session = await getAttendanceSession(subjectId, date);
+  const session = await getAttendanceSession(subjectId, divisionId, date);
   attRecords = session ? { ...session.records } : {};
   // Initialize missing
   attStudents.forEach(s => {
@@ -1687,12 +1667,13 @@ window.markAll = function(status) {
 
 window.saveAttendance = async function() {
   const subjectId = document.getElementById("attSubject").value;
+  const divisionId = document.getElementById("attDivision").value;
   const date = document.getElementById("attDate").value;
-  if (!subjectId || !date) { alert("Please select a subject and date."); return; }
+  if (!subjectId || !divisionId || !date) { alert("Please select a subject, division, and date."); return; }
   if (!attStudents.length) { alert("No students found."); return; }
   setLoading(true);
 
-  await saveAttendanceSession(subjectId, date, attRecords);
+  await saveAttendanceSession(subjectId, divisionId, date, attRecords);
   setLoading(false);
   openModal("modalSaveSuccess");
 };
@@ -1700,10 +1681,11 @@ window.saveAttendance = async function() {
 // ===== HISTORY =====
 window.loadHistory = async function() {
   const subjectId = document.getElementById("histSubject").value;
+  const divisionId = document.getElementById("histDivision").value;
   const list = document.getElementById("historyList");
-  if (!subjectId) { list.innerHTML = `<div class="empty-state"><p>Select a subject.</p></div>`; return; }
+  if (!subjectId || !divisionId) { list.innerHTML = `<div class="empty-state"><p>Select a subject and division.</p></div>`; return; }
   renderHistorySkeleton();
-  const sessions = await getSubjectAttendance(subjectId);
+  const sessions = await getSubjectAttendance(subjectId, divisionId);
   if (!sessions.length) {
     list.innerHTML = `<div class="empty-state"><p>No attendance sessions recorded for this subject.</p></div>`;
     return;
@@ -1756,7 +1738,8 @@ window.loadHistory = async function() {
 
 window.viewSession = async function(subjectId, date) {
   setLoading(true);
-  const session = await getAttendanceSession(subjectId, date);
+  const divisionId = document.getElementById("histDivision").value;
+  const session = await getAttendanceSession(subjectId, divisionId, date);
   setLoading(false);
   if (!session) { alert("Session not found."); return; }
 
@@ -1806,16 +1789,19 @@ window.deleteHistSession = async function(subjectId, date) {
   if (!confirm("Delete this attendance session?")) return;
   setLoading(true);
 
-  await deleteAttendanceSession(subjectId, date);
+  const divisionId = document.getElementById("histDivision").value;
+  await deleteAttendanceSession(subjectId, divisionId, date);
   await loadHistory();
 };
 
 window.openSessionEdit = async function(subjectId, date) {
   setLoading(true);
-  const session = await getAttendanceSession(subjectId, date);
+  const divisionId = document.getElementById("histDivision").value;
+  const session = await getAttendanceSession(subjectId, divisionId, date);
   setLoading(false);
   if (!session) { alert("Session not found."); return; }
   editSessionSubjectId = subjectId;
+  editSessionDivisionId = divisionId;
   editSessionDate = date;
   editSessionRecords = { ...session.records };
   editSessionRolls = Object.keys(session.records).sort((a,b) => parseInt(a) - parseInt(b));
@@ -1860,7 +1846,7 @@ window.sessionMarkAll = function(status) {
 window.saveSessionEdit = async function() {
   setLoading(true);
 
-  await saveAttendanceSession(editSessionSubjectId, editSessionDate, editSessionRecords);
+  await saveAttendanceSession(editSessionSubjectId, editSessionDivisionId, editSessionDate, editSessionRecords);
   closeModal("modalSession");
   await loadHistory();
   setLoading(false);
@@ -1870,7 +1856,7 @@ window.deleteSession = async function() {
   if (!confirm("Delete this session permanently?")) return;
   setLoading(true);
 
-  await deleteAttendanceSession(editSessionSubjectId, editSessionDate);
+  await deleteAttendanceSession(editSessionSubjectId, editSessionDivisionId, editSessionDate);
   closeModal("modalSession");
   await loadHistory();
   setLoading(false);
@@ -1997,7 +1983,7 @@ window.downloadSessionExcel = async function() {
 window.loadExportDivisions = async function() {
   const classId = document.getElementById("exportClass").value;
   const subjectSel = document.getElementById("exportSubject");
-  subjectSel.innerHTML = `<option value="">Choose subject...</option>`;
+  subjectSel.innerHTML = `<option value="" disabled selected hidden>Choose subject...</option>`;
   if (!classId) return;
   // Only show this teacher's subjects for this class
   const classSubjects = subjects.filter(s => s.classId === classId);
@@ -2013,7 +1999,7 @@ window.loadExportDivisions = async function() {
 function populateExportDropdowns() {
   const ec = document.getElementById("exportClass");
   const ev = ec.value;
-  ec.innerHTML = `<option value="">Choose class...</option>` +
+  ec.innerHTML = `<option value="" disabled selected hidden>Choose class...</option>` +
     classes.map(c => `<option value="${c.id}">${c.name}</option>`).join("");
   if (ev) ec.value = ev;
 
@@ -2038,13 +2024,15 @@ window.downloadClassReport = async function() {
   const className   = getClassName(classId);
   const divs        = await getDivisions(classId);
   const allSessions = await getSubjectAttendance(subjectId);
-  const monthSess   = allSessions
-    .filter(s => s.date && s.date.startsWith(month))
-    .sort((a, b) => a.date.localeCompare(b.date));
 
   const wb = XLSX.utils.book_new();
 
   for (const div of divs) {
+    // Filter sessions to only those for this specific division in the selected month
+    const divMonthSess = allSessions
+      .filter(s => s.divisionId === div.id && s.date && s.date.startsWith(month))
+      .sort((a, b) => a.date.localeCompare(b.date));
+
     const students = await getDivisionStudents(classId, div.id);
     const sorted   = [...students].sort((a, b) => parseInt(a.roll) - parseInt(b.roll));
 
@@ -2055,14 +2043,14 @@ window.downloadClassReport = async function() {
     });
 
     // Build data
-    const dateHdrs = monthSess.map(s => fmtDate(s.date));
+    const dateHdrs = divMonthSess.map(s => fmtDate(s.date));
     const header   = ["Name", "Roll Number", ...dateHdrs, "Overall %"];
     const wsData   = [header];
 
     sorted.forEach(s => {
       const name = nameMap[s.uid] || (s.uid ? "Linked" : "—");
       let present = 0, total = 0;
-      const statuses = monthSess.map(session => {
+      const statuses = divMonthSess.map(session => {
         const st = session.records?.[s.roll];
         if (st) { total++; if (st === "P") present++; }
         return st || "—";

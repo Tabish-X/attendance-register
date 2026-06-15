@@ -11,9 +11,9 @@ const { withRateLimit } = require('./_lib/rateLimit');
 async function handleSessionReport(req, res) {
   if (req.method !== 'GET') return sendError(res, 405, 'Method not allowed');
 
-  const { subjectId, date } = req.query;
-  if (!subjectId || !date) {
-    return sendError(res, 400, 'subjectId and date are required');
+  const { subjectId, divisionId, date } = req.query;
+  if (!subjectId || !divisionId || !date) {
+    return sendError(res, 400, 'subjectId, divisionId, and date are required');
   }
 
   const subDoc = await adminDb.collection('subjects').doc(subjectId).get();
@@ -21,7 +21,7 @@ async function handleSessionReport(req, res) {
     return sendError(res, 403, 'Access denied');
   }
 
-  const sessionId = `${subjectId}_${date}`;
+  const sessionId = `${subjectId}_${divisionId}_${date}`;
   const attSnap = await adminDb.collection('attendance').doc(sessionId).get();
   if (!attSnap.exists) {
     return sendError(res, 404, 'Session not found');
@@ -31,7 +31,7 @@ async function handleSessionReport(req, res) {
   const subData = subDoc.data();
 
   const studentsSnap = await adminDb.collection('classes').doc(subData.classId)
-    .collection('divisions').doc(subData.divisionId)
+    .collection('divisions').doc(divisionId)
     .collection('students').get();
 
   const docDataList = studentsSnap.docs.map(doc => doc.data());
@@ -98,8 +98,7 @@ async function handleClassReport(req, res) {
       // Step 1: Fetch subjects and students for this division in parallel
       const [subsSnap, studentsSnap] = await Promise.all([
         adminDb.collection('subjects')
-          .where('classId', '==', classId)
-          .where('divisionId', '==', divDoc.id).get(),
+          .where('classId', '==', classId).get(),
         adminDb.collection('classes').doc(classId)
           .collection('divisions').doc(divDoc.id)
           .collection('students').get(),
@@ -113,7 +112,12 @@ async function handleClassReport(req, res) {
       
       const [userSnaps, attendanceSnapsList] = await Promise.all([
         Promise.all(uidsToFetch.map(uid => adminDb.collection('users').doc(uid).get())),
-        Promise.all(subjects.map(sub => adminDb.collection('attendance').where('subjectId', '==', sub.id).get())),
+        Promise.all(subjects.map(sub =>
+          adminDb.collection('attendance')
+            .where('subjectId', '==', sub.id)
+            .where('divisionId', '==', divDoc.id)
+            .get()
+        )),
       ]);
 
       // Map user profiles

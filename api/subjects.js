@@ -60,16 +60,18 @@ async function handler(req, res) {
   // ── LIST / CREATE ENDPOINTS (WITHOUT ID) ──────────────────
   // GET — list subjects
   if (req.method === 'GET') {
-    if (classId && divisionId) {
-      // If student, verify link to division
+    if (classId) {
+      // If student, verify link to division or class
       if (req.user.role === 'student') {
-        const linkSnap = await adminDb.collection('studentLinks')
+        let query = adminDb.collection('studentLinks')
           .where('uid', '==', req.user.uid)
-          .where('classId', '==', classId)
-          .where('divisionId', '==', divisionId)
-          .limit(1).get();
+          .where('classId', '==', classId);
+        if (divisionId) {
+          query = query.where('divisionId', '==', divisionId);
+        }
+        const linkSnap = await query.limit(1).get();
         if (linkSnap.empty) {
-          return sendError(res, 403, 'Access denied: not linked to this division');
+          return sendError(res, 403, 'Access denied: not linked to this class/division');
         }
       } else if (req.user.role === 'teacher') {
         // If teacher, verify class ownership
@@ -82,8 +84,7 @@ async function handler(req, res) {
       }
 
       const snap = await adminDb.collection('subjects')
-        .where('classId', '==', classId)
-        .where('divisionId', '==', divisionId).get();
+        .where('classId', '==', classId).get();
       const subjects = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       return sendSuccess(res, { subjects });
     }
@@ -101,8 +102,8 @@ async function handler(req, res) {
   if (req.method === 'POST') {
     if (req.user.role !== 'teacher') return sendError(res, 403, 'Forbidden');
 
-    const { classId: cId, divisionId: dId, name } = req.body || {};
-    const check = requireFields(req.body, ['classId', 'divisionId', 'name']);
+    const { classId: cId, name } = req.body || {};
+    const check = requireFields(req.body, ['classId', 'name']);
     if (!check.valid) return sendError(res, 400, `Missing: ${check.missing.join(', ')}`);
 
     const cleanName = sanitizeString(name, 100);
@@ -114,21 +115,15 @@ async function handler(req, res) {
       return sendError(res, 403, 'Access denied');
     }
 
-    // Verify division exists
-    const divDoc = await adminDb.collection('classes').doc(cId)
-      .collection('divisions').doc(dId).get();
-    if (!divDoc.exists) return sendError(res, 404, 'Division not found');
-
     const ref = await adminDb.collection('subjects').add({
       teacherUid: req.user.uid,
       classId: cId,
-      divisionId: dId,
       name: cleanName,
       createdAt: FieldValue.serverTimestamp(),
     });
 
     logAudit(req, 'SUBJECT_CREATE', `subjects/${ref.id}`,
-      { name: cleanName, classId: cId, divisionId: dId });
+      { name: cleanName, classId: cId });
 
     return sendCreated(res, { id: ref.id });
   }

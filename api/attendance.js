@@ -163,7 +163,7 @@ async function handleSessionDetail(req, res) {
 async function handleAttendanceList(req, res) {
   // GET — list sessions or get specific session
   if (req.method === 'GET') {
-    const { subjectId, date } = req.query;
+    const { subjectId, divisionId, date } = req.query;
     if (!subjectId) return sendError(res, 400, 'subjectId is required');
 
     const subDoc = await adminDb.collection('subjects').doc(subjectId).get();
@@ -173,22 +173,25 @@ async function handleAttendanceList(req, res) {
     }
 
     if (date) {
-      const sessionId = `${subjectId}_${date}`;
+      const sessionId = divisionId ? `${subjectId}_${divisionId}_${date}` : `${subjectId}_${date}`;
       const snap = await adminDb.collection('attendance').doc(sessionId).get();
       return sendSuccess(res, { session: snap.exists ? snap.data() : null });
     }
 
-    const snap = await adminDb.collection('attendance')
-      .where('subjectId', '==', subjectId).get();
+    let query = adminDb.collection('attendance').where('subjectId', '==', subjectId);
+    if (divisionId) {
+      query = query.where('divisionId', '==', divisionId);
+    }
+    const snap = await query.get();
     const sessions = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     return sendSuccess(res, { sessions });
   }
 
   // POST — save attendance session
   if (req.method === 'POST') {
-    const { subjectId, date, records } = req.body || {};
-    if (!subjectId || !date || !records) {
-      return sendError(res, 400, 'subjectId, date, and records are required');
+    const { subjectId, divisionId, date, records } = req.body || {};
+    if (!subjectId || !divisionId || !date || !records) {
+      return sendError(res, 400, 'subjectId, divisionId, date, and records are required');
     }
 
     if (!validateDate(date)) {
@@ -204,11 +207,17 @@ async function handleAttendanceList(req, res) {
       return sendError(res, 403, 'Access denied');
     }
 
+    // Verify division belongs to class
+    const divDoc = await adminDb.collection('classes').doc(subDoc.data().classId)
+      .collection('divisions').doc(divisionId).get();
+    if (!divDoc.exists) return sendError(res, 404, 'Division not found');
+
     const checksum = generateChecksum(subjectId, date, records);
-    const sessionId = `${subjectId}_${date}`;
+    const sessionId = `${subjectId}_${divisionId}_${date}`;
 
     await adminDb.collection('attendance').doc(sessionId).set({
       subjectId,
+      divisionId,
       date,
       records,
       checksum,
@@ -216,7 +225,7 @@ async function handleAttendanceList(req, res) {
     });
 
     logAudit(req, 'ATTENDANCE_SAVE', `attendance/${sessionId}`,
-      { subjectId, date, rollCount: Object.keys(records).length });
+      { subjectId, divisionId, date, rollCount: Object.keys(records).length });
 
     return sendSuccess(res, { saved: true, sessionId });
   }

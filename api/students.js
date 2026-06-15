@@ -305,7 +305,7 @@ async function handleOverview(req, res) {
         const [classDoc, divDoc, subsSnap] = await Promise.all([
           adminDb.collection('classes').doc(classId).get(),
           adminDb.collection('classes').doc(classId).collection('divisions').doc(divisionId).get(),
-          adminDb.collection('subjects').where('classId', '==', classId).where('divisionId', '==', divisionId).get(),
+          adminDb.collection('subjects').where('classId', '==', classId).get(),
         ]);
 
         const className = classDoc.exists ? classDoc.data().name || '' : '';
@@ -327,6 +327,7 @@ async function handleOverview(req, res) {
         allSubjects.push({
           sub,
           roll: myRoll || detail.link.roll,
+          divisionId: detail.link.divisionId,
           className: detail.className,
           divisionName: detail.divisionName,
         });
@@ -335,7 +336,10 @@ async function handleOverview(req, res) {
 
     const attendanceSnaps = await Promise.all(
       allSubjects.map((item) =>
-        adminDb.collection('attendance').where('subjectId', '==', item.sub.id).get()
+        adminDb.collection('attendance')
+          .where('subjectId', '==', item.sub.id)
+          .where('divisionId', '==', item.divisionId)
+          .get()
       )
     );
 
@@ -419,21 +423,24 @@ async function handleSubjectAttendance(req, res) {
   const subDoc = await adminDb.collection('subjects').doc(subjectId).get();
   if (!subDoc.exists) return sendError(res, 404, 'Subject not found');
 
-  const { classId, divisionId } = subDoc.data();
+  const { classId } = subDoc.data();
 
   const linksSnap = await adminDb.collection('studentLinks')
     .where('uid', '==', uid)
-    .where('classId', '==', classId)
-    .where('divisionId', '==', divisionId).get();
+    .where('classId', '==', classId).get();
 
-  if (linksSnap.empty) return sendError(res, 403, 'You are not linked to this division');
+  if (linksSnap.empty) return sendError(res, 403, 'You are not linked to this class');
+
+  const studentLink = linksSnap.docs[0].data();
+  const divisionId = studentLink.divisionId;
 
   const userDoc = await adminDb.collection('users').doc(uid).get();
   const myRoll = userDoc.exists ? userDoc.data().myRoll : null;
   if (!myRoll) return sendError(res, 400, 'Roll number not set');
 
   const attSnap = await adminDb.collection('attendance')
-    .where('subjectId', '==', subjectId).get();
+    .where('subjectId', '==', subjectId)
+    .where('divisionId', '==', divisionId).get();
 
   const records = [];
   for (const attDoc of attSnap.docs) {

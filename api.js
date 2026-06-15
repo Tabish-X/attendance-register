@@ -122,8 +122,8 @@ export async function deleteStudent(classId, divisionId, studentDocId) {
 
 // ===== SUBJECTS =====
 
-export async function createSubject(classId, divisionId, name) {
-  return apiCall("POST", "subjects", { classId, divisionId, name });
+export async function createSubject(classId, name) {
+  return apiCall("POST", "subjects", { classId, name });
 }
 
 export async function getTeacherSubjects() {
@@ -146,22 +146,26 @@ export async function deleteSubject(subjectId) {
 
 // ===== ATTENDANCE =====
 
-export async function saveAttendanceSession(subjectId, date, records) {
-  return apiCall("POST", "attendance", { subjectId, date, records });
+export async function saveAttendanceSession(subjectId, divisionId, date, records) {
+  return apiCall("POST", "attendance", { subjectId, divisionId, date, records });
 }
 
-export async function getAttendanceSession(subjectId, date) {
-  const data = await apiCall("GET", `attendance?subjectId=${subjectId}&date=${date}`);
+export async function getAttendanceSession(subjectId, divisionId, date) {
+  const data = await apiCall("GET", `attendance?subjectId=${subjectId}&divisionId=${divisionId}&date=${date}`);
   return data.session || null;
 }
 
-export async function getSubjectAttendance(subjectId) {
-  const data = await apiCall("GET", `attendance?subjectId=${subjectId}`);
+export async function getSubjectAttendance(subjectId, divisionId = "") {
+  let url = `attendance?subjectId=${subjectId}`;
+  if (divisionId) {
+    url += `&divisionId=${divisionId}`;
+  }
+  const data = await apiCall("GET", url);
   return data.sessions || [];
 }
 
-export async function deleteAttendanceSession(subjectId, date) {
-  const sessionId = `${subjectId}_${date}`;
+export async function deleteAttendanceSession(subjectId, divisionId, date) {
+  const sessionId = `${subjectId}_${divisionId}_${date}`;
   return apiCall("DELETE", `attendance/${encodeURIComponent(sessionId)}`);
 }
 
