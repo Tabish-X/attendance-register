@@ -19,6 +19,9 @@
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono&display=swap" rel="stylesheet">
 <link rel="preload" href="style.css" as="style">
 <link rel="stylesheet" href="style.css" />
+<link rel="icon" type="image/x-icon" href="favicon.ico" />
+<link rel="icon" type="image/png" sizes="192x192" href="favicon.png" />
+<link rel="apple-touch-icon" href="favicon.png" />
 <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js">
 <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js">
 <link rel="modulepreload" href="firebase.js">
@@ -252,7 +255,10 @@
 
 <!-- TOPBAR -->
 <header class="topbar">
-  <span class="topbar-brand">Attendify</span>
+  <span class="topbar-brand" style="display: inline-flex; align-items: center; gap: 8px;">
+    <img src="logo.png" alt="Attendify Logo" style="height: 24px; width: auto;" />
+    <span>Attendify</span>
+  </span>
   <div class="topbar-right">
     <button id="themeToggle" class="btn-icon" onclick="toggleTheme()" aria-label="Toggle dark mode"></button>
     <div class="profile-dropdown-wrap" id="profileWrap">
