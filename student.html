@@ -15,8 +15,14 @@
   })();
 </script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono&display=swap" rel="stylesheet">
+<link rel="preload" href="style.css" as="style">
 <link rel="stylesheet" href="style.css" />
+<link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js">
+<link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js">
+<link rel="modulepreload" href="firebase.js">
+<link rel="modulepreload" href="api.js">
 <style>
 .subject-att-card {
   background: var(--surface);
@@ -591,50 +597,71 @@ function renderSubjectWiseSkeleton() {
 }
 
 async function loadAllData(forceFresh = false) {
-  // Always render skeletons first for loading feedback
-  renderOverviewSkeleton();
-  renderSubjectWiseSkeleton();
+  const hasCachedOverview = !!localStorage.getItem(`cachedOverview_${currentUser.uid}`);
 
-  const startTime = Date.now();
+  // Only render skeletons if we don't have cached data
+  if (!hasCachedOverview) {
+    renderOverviewSkeleton();
+    renderSubjectWiseSkeleton();
+  } else {
+    // Render optimistically from cache immediately if not already done
+    try {
+      const cachedOverview = JSON.parse(localStorage.getItem(`cachedOverview_${currentUser.uid}`));
+      if (cachedOverview) {
+        processOverviewData(cachedOverview);
+        renderOverview();
+        renderSubjectWise();
+        renderAccountPage();
+        checkDefaulterWarning();
+      }
+    } catch (_) {}
+  }
 
   try {
+    const prevOverviewStr = localStorage.getItem(`cachedOverview_${currentUser.uid}`);
+    
+    let overview;
     try {
-      const overview = await getStudentOverview();
-      localStorage.setItem(`cachedOverview_${currentUser.uid}`, JSON.stringify(overview));
-      processOverviewData(overview);
+      overview = await getStudentOverview();
+      const newOverviewStr = JSON.stringify(overview);
+      localStorage.setItem(`cachedOverview_${currentUser.uid}`, newOverviewStr);
+      
+      // Only re-render if the overview data changed
+      if (prevOverviewStr !== newOverviewStr) {
+        processOverviewData(overview);
+        renderOverview();
+        renderSubjectWise();
+        renderAccountPage();
+        checkDefaulterWarning();
+      }
     } catch(e) {
       console.error('Failed to load overview, trying fallback:', e);
+      // Fallback: fetch links only
       myLinks = await findStudentLinks();
       allSubjectData = [];
-    }
-
-    // Wait for a minimum of 600ms to make the skeleton UI clearly visible
-    const elapsed = Date.now() - startTime;
-    await new Promise(resolve => setTimeout(resolve, Math.max(0, 600 - elapsed)));
-
-    renderOverview();
-    renderSubjectWise();
-    renderAccountPage();
-    checkDefaulterWarning();
-  } catch (e) {
-    console.error("Fresh load failed, using cache if available:", e);
-    let cachedOverview = null;
-    try {
-      cachedOverview = JSON.parse(localStorage.getItem(`cachedOverview_${currentUser.uid}`));
-    } catch(_) {}
-
-    if (cachedOverview) {
-      processOverviewData(cachedOverview);
-      
-      const elapsed = Date.now() - startTime;
-      await new Promise(resolve => setTimeout(resolve, Math.max(0, 600 - elapsed)));
-
       renderOverview();
       renderSubjectWise();
       renderAccountPage();
       checkDefaulterWarning();
-    } else {
-      alert("Error loading student data: " + e.message);
+    }
+  } catch (e) {
+    console.error("Fresh load failed, using cache if available:", e);
+    // If fresh load completely failed and we didn't render from cache, do it now
+    if (!hasCachedOverview) {
+      let cachedOverview = null;
+      try {
+        cachedOverview = JSON.parse(localStorage.getItem(`cachedOverview_${currentUser.uid}`));
+      } catch(_) {}
+
+      if (cachedOverview) {
+        processOverviewData(cachedOverview);
+        renderOverview();
+        renderSubjectWise();
+        renderAccountPage();
+        checkDefaulterWarning();
+      } else {
+        alert("Error loading student data: " + e.message);
+      }
     }
   }
 }

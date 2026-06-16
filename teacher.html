@@ -15,8 +15,14 @@
   })();
 </script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono&display=swap" rel="stylesheet">
+<link rel="preload" href="style.css" as="style">
 <link rel="stylesheet" href="style.css" />
+<link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js">
+<link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js">
+<link rel="modulepreload" href="firebase.js">
+<link rel="modulepreload" href="api.js">
 <style>
 .class-card {
   background: var(--surface);
@@ -989,58 +995,78 @@ function renderStudentsSkeleton() {
 }
 
 async function loadAllData() {
-  // Always show skeletons first to give loading feedback
-  renderClassesSkeleton();
-  renderSubjectsSkeleton();
+  const hasCachedClasses = !!localStorage.getItem(`cachedClasses_${currentUser.uid}`);
+  const hasCachedSubjects = !!localStorage.getItem(`cachedSubjects_${currentUser.uid}`);
 
-  const startTime = Date.now();
-
-  try {
-    const [cData, sData] = await Promise.all([
-      getTeacherClasses(),
-      getTeacherSubjects()
-    ]);
-    classes = cData;
-    subjects = sData;
-    localStorage.setItem(`cachedClasses_${currentUser.uid}`, JSON.stringify(classes));
-    localStorage.setItem(`cachedSubjects_${currentUser.uid}`, JSON.stringify(subjects));
-
-    // Wait for a minimum of 600ms so the user can see the skeleton transition
-    const elapsed = Date.now() - startTime;
-    await new Promise(resolve => setTimeout(resolve, Math.max(0, 600 - elapsed)));
-
-    renderClasses();
-    renderSubjectsPage();
-    populateSubjectDropdowns();
-    populateClassDropdowns();
-    populateExportDropdowns();
-    document.getElementById("attDate").value = new Date().toISOString().slice(0,10);
-    startPeriodicTamperCheck();
-  } catch (e) {
-    console.error("Fresh fetch failed, using cache if available:", e);
-    let cachedClasses = null;
-    let cachedSubjects = null;
+  // Only render skeletons if we don't have cached data
+  if (!hasCachedClasses || !hasCachedSubjects) {
+    renderClassesSkeleton();
+    renderSubjectsSkeleton();
+  } else {
+    // Render optimistically from cache immediately if not already done
     try {
-      cachedClasses = JSON.parse(localStorage.getItem(`cachedClasses_${currentUser.uid}`));
-      cachedSubjects = JSON.parse(localStorage.getItem(`cachedSubjects_${currentUser.uid}`));
-    } catch(_) {}
-
-    if (cachedClasses && cachedSubjects) {
-      classes = cachedClasses;
-      subjects = cachedSubjects;
-      
-      const elapsed = Date.now() - startTime;
-      await new Promise(resolve => setTimeout(resolve, Math.max(0, 600 - elapsed)));
-
+      classes = JSON.parse(localStorage.getItem(`cachedClasses_${currentUser.uid}`)) || [];
+      subjects = JSON.parse(localStorage.getItem(`cachedSubjects_${currentUser.uid}`)) || [];
       renderClasses();
       renderSubjectsPage();
       populateSubjectDropdowns();
       populateClassDropdowns();
       populateExportDropdowns();
-      document.getElementById("attDate").value = new Date().toISOString().slice(0,10);
-      startPeriodicTamperCheck();
-    } else {
-      alert("Error loading dashboard data: " + e.message);
+    } catch (_) {}
+  }
+
+  try {
+    const prevClassesStr = localStorage.getItem(`cachedClasses_${currentUser.uid}`);
+    const prevSubjectsStr = localStorage.getItem(`cachedSubjects_${currentUser.uid}`);
+
+    const [cData, sData] = await Promise.all([
+      getTeacherClasses(),
+      getTeacherSubjects()
+    ]);
+    
+    classes = cData;
+    subjects = sData;
+    
+    const newClassesStr = JSON.stringify(classes);
+    const newSubjectsStr = JSON.stringify(subjects);
+    
+    localStorage.setItem(`cachedClasses_${currentUser.uid}`, newClassesStr);
+    localStorage.setItem(`cachedSubjects_${currentUser.uid}`, newSubjectsStr);
+
+    // Only update and re-render if the fetched data differs from cache
+    if (prevClassesStr !== newClassesStr || prevSubjectsStr !== newSubjectsStr) {
+      renderClasses();
+      renderSubjectsPage();
+      populateSubjectDropdowns();
+      populateClassDropdowns();
+      populateExportDropdowns();
+    }
+    document.getElementById("attDate").value = new Date().toISOString().slice(0,10);
+    startPeriodicTamperCheck();
+  } catch (e) {
+    console.error("Fresh fetch failed, using cache if available:", e);
+    // If fresh fetch fails and we didn't render from cache yet, try rendering it now
+    if (!hasCachedClasses || !hasCachedSubjects) {
+      let cachedClasses = null;
+      let cachedSubjects = null;
+      try {
+        cachedClasses = JSON.parse(localStorage.getItem(`cachedClasses_${currentUser.uid}`));
+        cachedSubjects = JSON.parse(localStorage.getItem(`cachedSubjects_${currentUser.uid}`));
+      } catch(_) {}
+
+      if (cachedClasses && cachedSubjects) {
+        classes = cachedClasses;
+        subjects = cachedSubjects;
+        renderClasses();
+        renderSubjectsPage();
+        populateSubjectDropdowns();
+        populateClassDropdowns();
+        populateExportDropdowns();
+        document.getElementById("attDate").value = new Date().toISOString().slice(0,10);
+        startPeriodicTamperCheck();
+      } else {
+        alert("Error loading dashboard data: " + e.message);
+      }
     }
   }
 }
