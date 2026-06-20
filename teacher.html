@@ -1218,6 +1218,11 @@ async function renderClasses() {
     return;
   }
 
+  // Show skeletons while fetching divisions if the list is currently empty
+  if (!list.innerHTML || list.innerHTML.trim() === "") {
+    renderClassesSkeleton();
+  }
+
   // Pre-fetch divisions for all classes in parallel to avoid sequential delays and DOM race conditions
   const divisionsMap = {};
   const promises = classes.map(async (cls) => {
