@@ -98,13 +98,13 @@ async function handleJoin(req, res) {
     const myRoll = userSnap.data().myRoll;
     if (!myRoll || myRoll === '') return sendError(res, 400, 'Please set your roll number first.');
 
-    const existingLinkSnap = await adminDb.collection('studentLinks')
+    const existingLinksSnap = await adminDb.collection('studentLinks')
       .where('uid', '==', uid)
-      .where('classId', '==', classId)
-      .where('divisionId', '==', divisionId)
       .limit(1).get();
 
-    if (!existingLinkSnap.empty) return sendError(res, 409, 'You have already joined this division.');
+    if (!existingLinksSnap.empty) {
+      return sendError(res, 400, 'You have already joined a division. You can only choose one division.');
+    }
 
     const rollTakenSnap = await adminDb.collection('studentLinks')
       .where('classId', '==', classId)

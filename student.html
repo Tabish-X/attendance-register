@@ -478,7 +478,11 @@ onAuthStateChanged(auth, async (user) => {
     loginCheck().then(data => {
       if (!data || data.role !== "student") {
         localStorage.removeItem("userProfile");
-        logoutUser().then(() => { window.location.href = "/"; });
+        if (data && data.role === "teacher") {
+          window.location.href = "/teacher";
+        } else {
+          logoutUser().then(() => { window.location.href = "/"; });
+        }
       } else {
         localStorage.setItem("userProfile", JSON.stringify({ ...data, uid: user.uid }));
       }
@@ -490,8 +494,12 @@ onAuthStateChanged(auth, async (user) => {
   try {
     const data = await loginCheck();
     if (!data || data.role !== "student") {
-      await logoutUser();
-      window.location.href = "/";
+      if (data && data.role === "teacher") {
+        window.location.href = "/teacher";
+      } else {
+        await logoutUser();
+        window.location.href = "/";
+      }
       return;
     }
     localStorage.setItem("userProfile", JSON.stringify({ ...data, uid: user.uid }));
@@ -800,6 +808,10 @@ window.handleSetRoll = async function() {
 
 // ===== JOIN DIVISION =====
 window.openJoinModal = function() {
+  if (myLinks && myLinks.length > 0) {
+    alert("You have already joined a division. You can only choose one division. Please leave your current division before joining a new one.");
+    return;
+  }
   document.getElementById("jCode").value = "";
   if (myRoll) {
     document.getElementById("joinModalTitle").textContent = "Join a Division";
@@ -817,6 +829,10 @@ window.openJoinModal = function() {
 };
 
 window.handleJoinDivision = async function() {
+  if (myLinks && myLinks.length > 0) {
+    alert("You have already joined a division. You can only choose one division.");
+    return;
+  }
   const code = document.getElementById("jCode").value.trim().toUpperCase();
   if (!code || code.length !== 6) { alert("Please enter a valid 6-character join code."); return; }
 
@@ -865,8 +881,12 @@ async function renderAccountPage() {
     document.getElementById("setRollCard").style.display = "block";
   }
 
-  document.getElementById("joinBtnWrap").innerHTML =
-    `<button class="btn btn-primary btn-sm" onclick="openJoinModal()">Join Division</button>`;
+  if (myLinks && myLinks.length > 0) {
+    document.getElementById("joinBtnWrap").innerHTML = "";
+  } else {
+    document.getElementById("joinBtnWrap").innerHTML =
+      `<button class="btn btn-primary btn-sm" onclick="openJoinModal()">Join Division</button>`;
+  }
 
   const list = document.getElementById("divisionsLinksList");
   if (!myLinks.length) {

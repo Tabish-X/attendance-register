@@ -42,6 +42,9 @@ export async function sendVerificationEmail() {
 
 // Sign out
 export async function logoutUser() {
+  try {
+    localStorage.removeItem("userProfile");
+  } catch (_) {}
   await signOut(auth);
 }
 

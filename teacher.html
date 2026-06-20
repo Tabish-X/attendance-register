@@ -843,7 +843,11 @@ onAuthStateChanged(auth, async (user) => {
     loginCheck().then(data => {
       if (!data || data.role !== "teacher") {
         localStorage.removeItem("userProfile");
-        logoutUser().then(() => { window.location.href = "/"; });
+        if (data && data.role === "student") {
+          window.location.href = "/student";
+        } else {
+          logoutUser().then(() => { window.location.href = "/"; });
+        }
       } else {
         localStorage.setItem("userProfile", JSON.stringify({ ...data, uid: user.uid }));
       }
@@ -855,8 +859,12 @@ onAuthStateChanged(auth, async (user) => {
   try {
     const data = await loginCheck();
     if (!data || data.role !== "teacher") {
-      await logoutUser();
-      window.location.href = "/";
+      if (data && data.role === "student") {
+        window.location.href = "/student";
+      } else {
+        await logoutUser();
+        window.location.href = "/";
+      }
       return;
     }
     localStorage.setItem("userProfile", JSON.stringify({ ...data, uid: user.uid }));
@@ -1928,6 +1936,30 @@ const sheetScript = document.createElement("script");
 sheetScript.src = "https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js";
 document.head.appendChild(sheetScript);
 
+async function getXLSX() {
+  if (window.XLSX) return window.XLSX;
+  return new Promise((resolve, reject) => {
+    let script = document.querySelector('script[src*="xlsx.bundle.js"]');
+    if (!script) {
+      script = document.createElement("script");
+      script.src = "https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js";
+      document.head.appendChild(script);
+    }
+    const onLoad = () => {
+      script.removeEventListener("load", onLoad);
+      script.removeEventListener("error", onError);
+      resolve(window.XLSX);
+    };
+    const onError = () => {
+      script.removeEventListener("load", onLoad);
+      script.removeEventListener("error", onError);
+      reject(new Error("Failed to load Excel export library."));
+    };
+    script.addEventListener("load", onLoad);
+    script.addEventListener("error", onError);
+  });
+}
+
 // Colour constants — your requested colours
 const GREEN = "FF06AA35";  // #06AA35 — present / >= 75%
 const RED   = "FFFF0000";  // #FF0000 — absent  / < 75%
@@ -1993,43 +2025,51 @@ window.downloadSessionExcel = async function() {
 
   setLoading(true);
 
-  // Names are already available from the API response
-  const students = attStudents;
-  const nameMap = {};
-  students.filter(s => s.uid && s.name).forEach(s => {
-    nameMap[s.uid] = s.name;
-  });
+  try {
+    const XLSX = await getXLSX();
 
-  const className = getClassName(subject.classId);
-  const divName   = await getDivisionName(subject.classId, subject.divisionId);
-  const sorted    = [...students].sort((a,b) => parseInt(a.roll) - parseInt(b.roll));
+    // Names are already available from the API response
+    const students = attStudents;
+    const nameMap = {};
+    students.filter(s => s.uid && s.name).forEach(s => {
+      nameMap[s.uid] = s.name;
+    });
 
-  // Build data rows
-  const wsData = [["Name", "Roll Number", `Date: ${fmtDate(date)}`]];
-  sorted.forEach(s => {
-    const status = attRecords[s.roll] || "A";
-    const name   = nameMap[s.uid] || (s.uid ? "Linked" : "Not linked");
-    wsData.push([name, parseInt(s.roll), status]);
-  });
+    const className = getClassName(subject.classId);
+    const divName   = await getDivisionName(subject.classId, subject.divisionId);
+    const sorted    = [...students].sort((a,b) => parseInt(a.roll) - parseInt(b.roll));
 
-  const wb = XLSX.utils.book_new();
-  const ws = XLSX.utils.aoa_to_sheet(wsData);
-  ws["!cols"] = [{ wch: 26 }, { wch: 14 }, { wch: 18 }];
+    // Build data rows
+    const wsData = [["Name", "Roll Number", `Date: ${fmtDate(date)}`]];
+    sorted.forEach(s => {
+      const status = attRecords[s.roll] || "A";
+      const name   = nameMap[s.uid] || (s.uid ? "Linked" : "Not linked");
+      wsData.push([name, parseInt(s.roll), status]);
+    });
 
-  // Style header row
-  ["A1", "B1", "C1"].forEach(addr => styleHeader(ws, addr));
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+    ws["!cols"] = [{ wch: 26 }, { wch: 14 }, { wch: 18 }];
 
-  // Style P / A cells in column C
-  sorted.forEach((_, i) => {
-    const addr = `C${i + 2}`;
-    const cell = ws[addr];
-    if (!cell) return;
-    stylePA(ws, addr, cell.v);
-  });
+    // Style header row
+    ["A1", "B1", "C1"].forEach(addr => styleHeader(ws, addr));
 
-  XLSX.utils.book_append_sheet(wb, ws, "Attendance");
-  XLSX.writeFile(wb, `${className}(${divName}) ${subject.name} ${fmtDate(date)}.xlsx`);
-  setLoading(false);
+    // Style P / A cells in column C
+    sorted.forEach((_, i) => {
+      const addr = `C${i + 2}`;
+      const cell = ws[addr];
+      if (!cell) return;
+      stylePA(ws, addr, cell.v);
+    });
+
+    XLSX.utils.book_append_sheet(wb, ws, "Attendance");
+    XLSX.writeFile(wb, `${className}(${divName}) ${subject.name} ${fmtDate(date)}.xlsx`);
+  } catch (err) {
+    console.error("Failed to generate session report:", err);
+    alert("Error generating report: " + err.message);
+  } finally {
+    setLoading(false);
+  }
 };
 
 // ===== EXPORT PAGE =====
@@ -2074,91 +2114,99 @@ window.downloadClassReport = async function() {
 
   setLoading(true);
 
-  const className   = getClassName(classId);
-  const divs        = await getDivisions(classId);
-  const allSessions = await getSubjectAttendance(subjectId);
+  try {
+    const XLSX = await getXLSX();
 
-  const wb = XLSX.utils.book_new();
+    const className   = getClassName(classId);
+    const divs        = await getDivisions(classId);
+    const allSessions = await getSubjectAttendance(subjectId);
 
-  for (const div of divs) {
-    // Filter sessions to only those for this specific division in the selected month
-    const divMonthSess = allSessions
-      .filter(s => s.divisionId === div.id && s.date && s.date.startsWith(month))
-      .sort((a, b) => a.date.localeCompare(b.date));
+    const wb = XLSX.utils.book_new();
 
-    const students = await getDivisionStudents(classId, div.id);
-    const sorted   = [...students].sort((a, b) => parseInt(a.roll) - parseInt(b.roll));
+    for (const div of divs) {
+      // Filter sessions to only those for this specific division in the selected month
+      const divMonthSess = allSessions
+        .filter(s => s.divisionId === div.id && s.date && s.date.startsWith(month))
+        .sort((a, b) => a.date.localeCompare(b.date));
 
-    // Names are already available from the API response
-    const nameMap = {};
-    sorted.filter(s => s.uid && s.name).forEach(s => {
-      nameMap[s.uid] = s.name;
-    });
+      const students = await getDivisionStudents(classId, div.id);
+      const sorted   = [...students].sort((a, b) => parseInt(a.roll) - parseInt(b.roll));
 
-    // Build data
-    const dateHdrs = divMonthSess.map(s => fmtDate(s.date));
-    const header   = ["Name", "Roll Number", ...dateHdrs, "Overall %"];
-    const wsData   = [header];
-
-    sorted.forEach(s => {
-      const name = nameMap[s.uid] || (s.uid ? "Linked" : "—");
-      let present = 0, total = 0;
-      const statuses = divMonthSess.map(session => {
-        const st = session.records?.[s.roll];
-        if (st) { total++; if (st === "P") present++; }
-        return st || "—";
-      });
-      const pctNum = total > 0 ? parseFloat(((present / total) * 100).toFixed(2)) : null;
-      const pctStr = pctNum !== null ? pctNum + "%" : "—";
-      wsData.push([name, parseInt(s.roll), ...statuses, pctStr]);
-    });
-
-    const ws = XLSX.utils.aoa_to_sheet(wsData);
-    ws["!cols"] = [
-      { wch: 24 }, { wch: 12 },
-      ...dateHdrs.map(() => ({ wch: 12 })),
-      { wch: 13 }
-    ];
-
-    // Style header row
-    header.forEach((_, ci) => {
-      styleHeader(ws, XLSX.utils.encode_cell({ r: 0, c: ci }));
-    });
-
-    // Style each student row
-    sorted.forEach((_, ri) => {
-      const row = ri + 1; // row 0 = header
-
-      // P / A cells
-      monthSess.forEach((_, ci) => {
-        const addr = XLSX.utils.encode_cell({ r: row, c: ci + 2 });
-        const cell = ws[addr];
-        if (!cell || cell.v === "—") return;
-        stylePA(ws, addr, cell.v);
+      // Names are already available from the API response
+      const nameMap = {};
+      sorted.filter(s => s.uid && s.name).forEach(s => {
+        nameMap[s.uid] = s.name;
       });
 
-      // Overall % cell
-      const pctAddr = XLSX.utils.encode_cell({ r: row, c: monthSess.length + 2 });
-      const pctCell = ws[pctAddr];
-      if (pctCell && pctCell.v !== "—") {
-        stylePct(ws, pctAddr, parseFloat(pctCell.v));
-      }
-    });
+      // Build data
+      const dateHdrs = divMonthSess.map(s => fmtDate(s.date));
+      const header   = ["Name", "Roll Number", ...dateHdrs, "Overall %"];
+      const wsData   = [header];
 
-    XLSX.utils.book_append_sheet(wb, ws, div.name.slice(0, 31));
-  }
+      sorted.forEach(s => {
+        const name = nameMap[s.uid] || (s.uid ? "Linked" : "—");
+        let present = 0, total = 0;
+        const statuses = divMonthSess.map(session => {
+          const st = session.records?.[s.roll];
+          if (st) { total++; if (st === "P") present++; }
+          return st || "—";
+        });
+        const pctNum = total > 0 ? parseFloat(((present / total) * 100).toFixed(2)) : null;
+        const pctStr = pctNum !== null ? pctNum + "%" : "—";
+        wsData.push([name, parseInt(s.roll), ...statuses, pctStr]);
+      });
 
-  if (wb.SheetNames.length === 0) {
-    alert("No divisions found for this class.");
+      const ws = XLSX.utils.aoa_to_sheet(wsData);
+      ws["!cols"] = [
+        { wch: 24 }, { wch: 12 },
+        ...dateHdrs.map(() => ({ wch: 12 })),
+        { wch: 13 }
+      ];
+
+      // Style header row
+      header.forEach((_, ci) => {
+        styleHeader(ws, XLSX.utils.encode_cell({ r: 0, c: ci }));
+      });
+
+      // Style each student row
+      sorted.forEach((_, ri) => {
+        const row = ri + 1; // row 0 = header
+
+        // P / A cells
+        divMonthSess.forEach((_, ci) => {
+          const addr = XLSX.utils.encode_cell({ r: row, c: ci + 2 });
+          const cell = ws[addr];
+          if (!cell || cell.v === "—") return;
+          stylePA(ws, addr, cell.v);
+        });
+
+        // Overall % cell
+        const pctAddr = XLSX.utils.encode_cell({ r: row, c: divMonthSess.length + 2 });
+        const pctCell = ws[pctAddr];
+        if (pctCell && pctCell.v !== "—") {
+          stylePct(ws, pctAddr, parseFloat(pctCell.v));
+        }
+      });
+
+      XLSX.utils.book_append_sheet(wb, ws, div.name.slice(0, 31));
+    }
+
+    if (wb.SheetNames.length === 0) {
+      alert("No divisions found for this class.");
+      return;
+    }
+
+    const [year, mon] = month.split("-");
+    const mNames = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+    XLSX.writeFile(wb, `${className} ${subject.name} ${mNames[parseInt(mon)-1]} ${year}.xlsx`);
+  } catch (err) {
+    console.error("Failed to generate class report:", err);
+    alert("Error generating report: " + err.message);
+  } finally {
     setLoading(false);
-    return;
   }
-
-  const [year, mon] = month.split("-");
-  const mNames = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-  XLSX.writeFile(wb, `${className} ${subject.name} ${mNames[parseInt(mon)-1]} ${year}.xlsx`);
-  setLoading(false);
 };
+
 
 
 // Dismiss tamper alert
